@@ -16,7 +16,7 @@ import ScrollStack, { ScrollStackItem } from "@/components/ScrollStack";
 
 const TargetCursor = dynamic(() => import("@/components/TargetCursor"), { ssr: false });
 
-const PHOTO = "/Gemini_Generated_Image_46qz8346qz8346qz-Picsart-BackgroundRemover cropped.png";
+const PHOTO = "/me.png";
 
 export default function Home() {
   const [entered, setEntered] = useState(false);

@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import ParticleText from "./ParticleText";
 
-const PHOTO = "/Gemini_Generated_Image_46qz8346qz8346qz-Picsart-BackgroundRemover cropped.png";
+const PHOTO = "/me.png";
 
 interface HeroProps {
     onEnter?: () => void;

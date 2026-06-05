@@ -10,7 +10,7 @@ import './Lanyard.css';
 
 const CARD_GLB = '/card.glb';
 const LANYARD_PNG = '/lanyard.png';
-const PHOTO = '/me%20.png';
+const PHOTO = '/me.png';
 
 extend({ MeshLineGeometry, MeshLineMaterial });
 

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { motion } from "framer-motion";
 
-const PHOTO = "/Gemini_Generated_Image_46qz8346qz8346qz-Picsart-BackgroundRemover cropped.png";
+const PHOTO = "/me.png";
 
 export default function About() {
     return (
