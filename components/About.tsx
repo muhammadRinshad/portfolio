@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { motion } from "framer-motion";
 
-const PHOTO = "/me%203.webp";
+const PHOTO = "/me%20cartoon%203.webp";
 
 export default function About() {
     return (
