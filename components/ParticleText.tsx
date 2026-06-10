@@ -9,14 +9,14 @@ interface P {
   vx: number; vy: number;
 }
 
-const STEP        = 5;
-const R           = 1.8;
-const SCATTER_MIN = 4;
-const SCATTER_MAX = 14;
-const REPEL_R     = 100;
-const REPEL_F     = 6;
-const SPRING      = 0.08;
-const DAMP        = 0.82;
+const STEP        = 3;
+const R           = 0.9;
+const SCATTER_MIN = 5;
+const SCATTER_MAX = 18;
+const REPEL_R     = 90;
+const REPEL_F     = 5;
+const SPRING      = 0.07;
+const DAMP        = 0.80;
 
 export default function ParticleText({
   lines,

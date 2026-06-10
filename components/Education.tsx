@@ -1,9 +1,6 @@
 "use client";
 
-import { motion, useAnimation } from "framer-motion";
-import { useRef, useEffect } from "react";
-
-const PAUSE_MS = 1600; // ms to hold scroll while animation plays
+import { motion } from "framer-motion";
 
 const education = [
     {
@@ -24,92 +21,25 @@ const education = [
     },
 ];
 
+const ease: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
 export default function Education() {
-    const sectionRef = useRef<HTMLElement>(null);
-    const controls = useAnimation();
-    const hasPlayed = useRef(false);
-
-    useEffect(() => {
-        /* explicitly initialise to hidden so elements never flash before observer fires */
-        controls.set("hidden");
-    }, [controls]);
-
-    useEffect(() => {
-        const el = sectionRef.current;
-        if (!el) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                const entry = entries[0];
-                // Only trigger when the card has reached the stack position (near top)
-                if (
-                    entry.isIntersecting &&
-                    entry.boundingClientRect.top < 260 &&
-                    !hasPlayed.current
-                ) {
-                    hasPlayed.current = true;
-
-                    // Pause Lenis scroll while animation plays
-                    window.dispatchEvent(new CustomEvent("scroll-pause"));
-
-                    controls.start("visible");
-
-                    setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent("scroll-resume"));
-                    }, PAUSE_MS);
-                }
-            },
-            { threshold: [0.5, 0.75, 0.95] }
-        );
-
-        observer.observe(el);
-        return () => observer.disconnect();
-    }, [controls]);
-
-    const container = {
-        hidden: {},
-        visible: {
-            transition: { staggerChildren: 0.22, delayChildren: 0.05 },
-        },
-    };
-
-    const ease: [number, number, number, number] = [0.22, 1, 0.36, 1];
-
-    // Top-down clip reveal: content is uncovered from the top edge downward
-    const revealDown = {
-        hidden: { clipPath: "inset(0% 0% 100% 0%)" },
-        visible: {
-            clipPath: "inset(0% 0% 0% 0%)",
-            transition: { duration: 0.65, ease },
-        },
-    };
-
-    // Heading: slide up + fade
-    const revealUp = {
-        hidden: { opacity: 0, y: 40 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.65, ease },
-        },
-    };
-
     return (
         <section
-            ref={sectionRef}
             id="education"
             className="w-full bg-transparent"
             style={{ padding: "clamp(2.5rem, 5vw, 4.5rem) 0" }}
         >
             <div className="section-content">
-                <motion.div
-                    variants={container}
-                    initial="hidden"
-                    animate={controls}
-                    className="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr] gap-10 lg:gap-16 items-start"
-                >
-                    {/* Left — section heading */}
-                    <motion.div variants={revealUp}>
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr] gap-10 lg:gap-16 items-start">
+
+                    {/* Left — heading */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 40 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, amount: 0.3 }}
+                        transition={{ duration: 0.65, ease }}
+                    >
                         <div className="flex items-center gap-4 mb-4">
                             <div className="h-[1px] w-12 bg-gray-cool" />
                             <span className="text-gray-cool font-mono text-xs tracking-widest uppercase">
@@ -125,32 +55,34 @@ export default function Education() {
                             <span className="text-gray-cool opacity-50">EDUCATION</span>
                         </h2>
 
-                        {/* Decorative vertical line */}
                         <motion.div
-                            variants={{
-                                hidden: { scaleY: 0, originY: 0 },
-                                visible: {
-                                    scaleY: 1,
-                                    transition: { duration: 0.9, ease, delay: 0.3 },
-                                },
-                            }}
+                            initial={{ scaleY: 0 }}
+                            whileInView={{ scaleY: 1 }}
+                            viewport={{ once: true, amount: 0.3 }}
+                            transition={{ duration: 0.9, ease, delay: 0.3 }}
+                            style={{ originY: 0 }}
                             className="hidden lg:block w-[1px] h-16 bg-gray-cool/30 mt-8"
                         />
                     </motion.div>
 
-                    {/* Right — education cards revealed top-down */}
+                    {/* Right — cards */}
                     <div className="flex flex-col gap-5">
-                        {education.map((item) => (
+                        {education.map((item, i) => (
                             <motion.div
                                 key={item.id}
-                                variants={revealDown}
-                                className="bg-charcoal-light/10 border border-ivory/5 backdrop-blur-xl rounded-2xl p-6 sm:p-8 hover:bg-charcoal-light/20 transition-colors duration-500 group"
+                                initial={{ opacity: 0, y: 32 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true, amount: 0.2 }}
+                                transition={{ duration: 0.6, ease, delay: i * 0.15 }}
+                                className="bg-charcoal-light/10 border border-ivory/5 backdrop-blur-xl rounded-2xl p-6 sm:p-8 hover:bg-charcoal-light/20 transition-colors duration-500"
                             >
                                 <span className="font-mono text-xs text-ivory/60 bg-ivory/5 px-3 py-1 rounded-full inline-block mb-3">
                                     {item.period}
                                 </span>
-                                <h3 className="font-display font-bold text-ivory mb-1"
-                                    style={{ fontSize: "clamp(1rem, 1.6vw, 1.25rem)" }}>
+                                <h3
+                                    className="font-display font-bold text-ivory mb-1"
+                                    style={{ fontSize: "clamp(1rem, 1.6vw, 1.25rem)" }}
+                                >
                                     {item.degree}
                                 </h3>
                                 <h4 className="font-sans text-sm text-gray-cool font-medium mb-3">
@@ -162,7 +94,7 @@ export default function Education() {
                             </motion.div>
                         ))}
                     </div>
-                </motion.div>
+                </div>
             </div>
         </section>
     );

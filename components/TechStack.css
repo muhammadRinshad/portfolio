@@ -1,69 +1,22 @@
-@keyframes ts-left {
-  from { transform: translateX(0); }
-  to   { transform: translateX(calc(-100% / 3)); }
-}
-
-@keyframes ts-right {
-  from { transform: translateX(calc(-100% / 3)); }
-  to   { transform: translateX(0); }
-}
-
-.ts-track-fwd {
-  display: flex;
-  gap: 14px;
-  width: max-content;
-  will-change: transform;
-  animation: ts-left 30s linear infinite;
-}
-
-.ts-track-rev {
-  display: flex;
-  gap: 14px;
-  width: max-content;
-  will-change: transform;
-  animation: ts-right 40s linear infinite;
-}
-
-.ts-marquee-wrapper {
-  position: relative;
-  overflow: hidden;
-}
-
-.ts-marquee-wrapper:hover .ts-track-fwd,
-.ts-marquee-wrapper:hover .ts-track-rev {
-  animation-play-state: paused;
-}
-
-/* Edge fades */
-.ts-marquee-wrapper::before,
-.ts-marquee-wrapper::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 80px;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.ts-marquee-wrapper::before {
-  left: 0;
-  background: linear-gradient(to right, #1f1f22, transparent);
-}
-
-.ts-marquee-wrapper::after {
-  right: 0;
-  background: linear-gradient(to left, #1f1f22, transparent);
-}
-
 .ts-icon {
   color: rgba(255, 255, 255, 0.28);
-  transition: color 0.3s ease;
+  transition: color 0.25s ease;
 }
 
 .ts-label {
   color: #6E7C7C;
-  transition: color 0.3s ease;
+  transition: color 0.25s ease;
+}
+
+.ts-card {
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+}
+
+.ts-card:hover {
+  transform: translateY(-6px) scale(1.06);
+  box-shadow: 0 0 28px -4px var(--glow), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  border-color: var(--glow-border) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
 }
 
 .ts-card:hover .ts-icon {

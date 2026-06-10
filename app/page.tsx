@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import WordTargetInit from "@/components/WordTargetInit";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
@@ -12,11 +11,8 @@ import Education from "@/components/Education";
 import TechStack from "@/components/TechStack";
 import Work from "@/components/Work";
 import Footer from "@/components/Footer";
-import ScrollStack, { ScrollStackItem } from "@/components/ScrollStack";
 
 const TargetCursor = dynamic(() => import("@/components/TargetCursor"), { ssr: false });
-
-const PHOTO = "/me.png";
 
 export default function Home() {
   const [entered, setEntered] = useState(false);
@@ -32,7 +28,6 @@ export default function Home() {
     setEntered(false);
   };
 
-  // Scroll up at top of About → return to Hero
   useEffect(() => {
     if (!entered) return;
 
@@ -58,24 +53,6 @@ export default function Home() {
   return (
     <main className="min-h-screen selection:bg-gray-cool selection:text-ivory relative overflow-x-hidden">
 
-      {/* Fixed photo — stays during Hero ↔ About transition */}
-      <AnimatePresence>
-        {!entered && (
-          <motion.div
-            key="fixed-photo"
-            className="fixed top-0 right-0 h-screen pointer-events-none hidden lg:block"
-            style={{ width: "50%", zIndex: 60 }}
-            initial={{ opacity: 0, y: hasLeftHero.current ? -30 : 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, transition: { duration: 0.5, delay: 0.65 } }}
-            transition={{ duration: 1.2, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <Image src={PHOTO} alt="" fill className="object-contain object-bottom" priority />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Dark sections — rendered only after entry */}
       {entered && (
         <>
           <WordTargetInit />
@@ -85,7 +62,6 @@ export default function Home() {
             hideDefaultCursor={true}
             parallaxOn={true}
           />
-
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -93,38 +69,16 @@ export default function Home() {
           >
             <Navbar />
           </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.35, duration: 0.8 }}
-            className="text-ivory"
-            style={{ background: "var(--color-charcoal)" }}
-          >
+          <div className="text-ivory" style={{ background: "var(--color-charcoal)" }}>
             <About />
-            <ScrollStack
-              useWindowScroll={true}
-              itemDistance={160}
-              itemScale={0.04}
-              itemStackDistance={20}
-              baseScale={0.88}
-              stackPosition="15%"
-              scaleEndPosition="8%"
-            >
-              <ScrollStackItem>
-                <Education />
-              </ScrollStackItem>
-              <ScrollStackItem>
-                <TechStack />
-              </ScrollStackItem>
-            </ScrollStack>
+            <Education />
+            <TechStack />
             <Work />
             <Footer />
-          </motion.div>
+          </div>
         </>
       )}
 
-      {/* Hero overlay — click to enter; slides back down when returning */}
       <AnimatePresence>
         {!entered && (
           <motion.div

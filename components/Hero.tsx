@@ -2,10 +2,8 @@
 
 import { useRef } from "react";
 import { motion } from "framer-motion";
-import Image from "next/image";
 import ParticleText from "./ParticleText";
-
-const PHOTO = "/me.png";
+import ProfilePhoto from "./ProfilePhoto";
 
 interface HeroProps {
     onEnter?: () => void;
@@ -22,7 +20,7 @@ export default function Hero({ onEnter }: HeroProps) {
             style={{ background: "#F5F5F0" }}
             onClick={onEnter}
         >
-            {/* Name & Designation — top on mobile, left on desktop */}
+            {/* Name & Designation */}
             <div className="section-content flex-1 flex flex-col justify-center pr-4 z-10">
                 <motion.span
                     initial={{ opacity: 0, y: 16 }}
@@ -45,19 +43,20 @@ export default function Hero({ onEnter }: HeroProps) {
                 </motion.div>
             </div>
 
-            {/* Mobile photo — below the name, hidden on desktop */}
+            {/* Mobile photo — below name */}
             <div className="lg:hidden relative w-full" style={{ height: "44vh" }}>
-                <Image
-                    src={PHOTO}
-                    alt="Muhammed Rinshad"
-                    fill
-                    className="object-contain object-center"
-                    priority
-                />
+                <ProfilePhoto objectPosition="center" priority />
             </div>
 
-            {/* Desktop right spacer — photo comes from fixed layer in page.tsx */}
-            <div className="hidden lg:flex flex-1" />
+            {/* Desktop photo — right column, hover reveals real photo */}
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 1.2, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                className="hidden lg:block relative flex-1"
+            >
+                <ProfilePhoto objectPosition="bottom" priority />
+            </motion.div>
 
             {/* Click-to-explore hint */}
             <motion.div
