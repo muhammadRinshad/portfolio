@@ -51,11 +51,14 @@ export default function About() {
                 </div>
             </motion.div>
 
-            {/* Mobile photo — below text, hidden on desktop */}
-            <div className="lg:hidden relative w-full" style={{ height: "65vw", maxHeight: "360px" }}>
+            {/* Mobile photo — absolute background behind text, hidden on desktop */}
+            <div
+                className="lg:hidden absolute inset-0 pointer-events-none"
+                style={{ opacity: 0.18, zIndex: 1 }}
+            >
                 <Image
                     src={PHOTO}
-                    alt="Muhammed Rinshad"
+                    alt=""
                     fill
                     className="object-contain object-bottom"
                     priority

@@ -11,6 +11,7 @@ import Education from "@/components/Education";
 import TechStack from "@/components/TechStack";
 import Work from "@/components/Work";
 import Footer from "@/components/Footer";
+import ProfilePhoto from "@/components/ProfilePhoto";
 
 const TargetCursor = dynamic(() => import("@/components/TargetCursor"), { ssr: false });
 
@@ -52,6 +53,24 @@ export default function Home() {
 
   return (
     <main className="min-h-screen selection:bg-gray-cool selection:text-ivory relative overflow-x-hidden">
+
+      {/* Desktop photo — fixed outside hero so it stays in place while hero slides up */}
+      <AnimatePresence>
+        {!entered && (
+          <motion.div
+            key="fixed-photo"
+            className="fixed top-0 right-0 h-screen hidden lg:block cursor-pointer select-none"
+            style={{ width: "50%", zIndex: 55 }}
+            onClick={enter}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.5, delay: 0.6 } }}
+            transition={{ duration: 1, delay: 0.15 }}
+          >
+            <ProfilePhoto objectPosition="bottom" priority />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {entered && (
         <>

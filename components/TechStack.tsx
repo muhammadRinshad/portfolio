@@ -81,21 +81,23 @@ export default function TechStack() {
     <section id="techstack" className="py-16 sm:py-20 bg-transparent w-full">
       <div className="section-content">
 
-        {/* Header */}
+        {/* Header row — stacked on mobile, h2 left + filter right on desktop */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: 0.65, ease: sectionEase }}
-          className="mb-10"
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6"
+          style={{ marginBottom: "2.5rem" }}
         >
-          <div className="flex items-center gap-4 mb-3">
-            <div className="h-[1px] w-8 bg-gray-cool" />
-            <span className="text-gray-cool font-mono text-xs tracking-widest uppercase">
-              My Toolkit
-            </span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+          {/* Left: label + heading */}
+          <div>
+            <div className="flex items-center gap-4 mb-3">
+              <div className="h-[1px] w-8 bg-gray-cool" />
+              <span className="text-gray-cool font-mono text-xs tracking-widest uppercase">
+                My Toolkit
+              </span>
+            </div>
             <h2
               className="font-display font-black text-ivory leading-none"
               style={{ fontSize: "clamp(2.2rem, 4.5vw, 4.5rem)" }}
@@ -104,22 +106,31 @@ export default function TechStack() {
               <br />
               <span className="text-gray-cool opacity-50">STACK</span>
             </h2>
+          </div>
 
-            {/* Category filter pills */}
-            <div className="flex flex-wrap gap-2">
+          {/* Right: filter buttons */}
+          <div className="overflow-x-auto scrollbar-none">
+            <div className="flex gap-3 w-max">
               {CATS.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setActive(cat)}
-                  className={`group relative font-mono text-[10px] tracking-widest uppercase px-4 py-2 rounded-full border transition-all duration-300 ${
-                    active === cat
-                      ? "bg-ivory text-charcoal border-ivory"
-                      : "text-gray-cool border-ivory/12 hover:border-ivory/35 hover:text-ivory"
-                  }`}
+                  className="relative outline-none focus:outline-none shrink-0 font-mono text-xs tracking-wider uppercase rounded-full border border-ivory/10"
+                  style={{ padding: "0.6rem 1.5rem" }}
                 >
-                  {cat}
-                  <span className={`ml-1.5 tabular-nums ${active === cat ? "text-charcoal/50" : "text-gray-cool/50"}`}>
-                    {counts[cat]}
+                  {active === cat && (
+                    <motion.span
+                      layoutId="ts-pill"
+                      className="absolute inset-0 rounded-full bg-ivory"
+                      transition={{ type: "spring", stiffness: 380, damping: 35 }}
+                    />
+                  )}
+                  <span
+                    className="relative tabular-nums"
+                    style={{ zIndex: 1, color: active === cat ? "#1A1A1D" : "#6E7C7C" }}
+                  >
+                    {cat}
+                    <span style={{ marginLeft: "0.4rem", opacity: 0.4, fontSize: "10px" }}>{counts[cat]}</span>
                   </span>
                 </button>
               ))}
@@ -130,8 +141,7 @@ export default function TechStack() {
         {/* Card grid */}
         <motion.div
           layout
-          className="grid gap-3"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))" }}
+          className="grid gap-3 grid-cols-3 sm:grid-cols-[repeat(auto-fill,minmax(100px,1fr))]"
         >
           <AnimatePresence mode="popLayout">
             {filtered.map((tech, i) => (

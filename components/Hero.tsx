@@ -2,8 +2,9 @@
 
 import { useRef } from "react";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import ParticleText from "./ParticleText";
-import ProfilePhoto from "./ProfilePhoto";
+
 
 interface HeroProps {
     onEnter?: () => void;
@@ -20,8 +21,10 @@ export default function Hero({ onEnter }: HeroProps) {
             style={{ background: "#F5F5F0" }}
             onClick={onEnter}
         >
-            {/* Name & Designation */}
-            <div className="section-content flex-1 flex flex-col justify-center pr-4 z-10">
+            {/* Name & Designation — shifted up on mobile */}
+            <div className="section-content flex-1 flex flex-col justify-start lg:justify-center pr-4 z-10">
+                {/* Mobile-only spacer — pushes text down on mobile, invisible on desktop */}
+                <div className="lg:hidden" style={{ height: "72px" }} />
                 <motion.span
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -43,20 +46,22 @@ export default function Hero({ onEnter }: HeroProps) {
                 </motion.div>
             </div>
 
-            {/* Mobile photo — below name */}
-            <div className="lg:hidden relative w-full" style={{ height: "44vh" }}>
-                <ProfilePhoto objectPosition="center" priority />
+            {/* Mobile photo — static image, no hover effect, hidden on desktop */}
+            <div
+                className="lg:hidden absolute inset-0 pointer-events-none"
+                style={{ zIndex: 1 }}
+            >
+                <Image
+                    src="/me%20cartoon%203.webp"
+                    alt=""
+                    fill
+                    className="object-contain object-bottom"
+                    priority
+                />
             </div>
 
-            {/* Desktop photo — right column, hover reveals real photo */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 1.2, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                className="hidden lg:block relative flex-1"
-            >
-                <ProfilePhoto objectPosition="bottom" priority />
-            </motion.div>
+            {/* Desktop spacer — photo lives in fixed layer in page.tsx */}
+            <div className="hidden lg:flex flex-1" />
 
             {/* Click-to-explore hint */}
             <motion.div
