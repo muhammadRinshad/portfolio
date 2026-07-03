@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import About from "@/components/About";
 import Education from "@/components/Education";
+import Experience from "@/components/Experience";
 import TechStack from "@/components/TechStack";
 import Work from "@/components/Work";
 import Footer from "@/components/Footer";
@@ -91,6 +92,7 @@ export default function Home() {
           <div className="text-ivory" style={{ background: "var(--color-charcoal)" }}>
             <About />
             <Education />
+            <Experience />
             <TechStack />
             <Work />
             <Footer />

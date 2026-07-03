@@ -5,24 +5,45 @@ import { useRef, useEffect, useLayoutEffect } from "react";
 const projects = [
     {
         id: 1,
-        title: "Social Media App",
-        category: "MERN Stack Application",
-        year: "2024",
-        image: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1974&auto=format&fit=crop",
+        title: "Haris & Co Academy",
+        category: "Educational Platform · Next.js",
+        image: "/projects/haca%20banner.webp",
+        url: "https://www.harisandcoacademy.com/",
     },
     {
         id: 2,
-        title: "Live Landing Pages",
-        category: "Next.js & Framer Motion",
-        year: "2024",
-        image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2015&auto=format&fit=crop",
+        title: "Marketing School",
+        category: "Academy Branding Page · Next.js",
+        image: "/projects/marketing%20school%20banner.webp",
+        url: "https://www.harisandcoacademy.com/marketing-school",
     },
     {
         id: 3,
+        title: "Design School",
+        category: "Academy Branding Page · Next.js",
+        image: "/projects/design%20school%20banner.webp",
+        url: "https://www.harisandcoacademy.com/design-school",
+    },
+    {
+        id: 4,
+        title: "Tech School",
+        category: "Academy Branding Page · Next.js",
+        image: "/projects/tech%20school%20banner.webp",
+        url: "https://www.harisandcoacademy.com/tech-school",
+    },
+    {
+        id: 5,
         title: "Music Playlist App",
-        category: "MERN Stack & Audio Streaming",
-        year: "2024",
-        image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070&auto=format&fit=crop",
+        category: "MERN Stack · Audio Streaming",
+        image: "/projects/music%20play.webp",
+        url: "https://musicplaylistfrontend.vercel.app/",
+    },
+    {
+        id: 6,
+        title: "Shopping Cart App",
+        category: "React · E-Commerce",
+        image: "/projects/shoping%20cart.webp",
+        url: "https://shopping-cart-pzoa.vercel.app/",
     },
 ];
 
@@ -150,25 +171,41 @@ export default function Work() {
                         <div style={{ flexShrink: 0, width: "clamp(120px, 38vw, 680px)" }} />
 
                         {projects.map((project, index) => (
-                            <div
+                            <a
                                 key={project.id}
+                                href={project.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="group relative overflow-hidden rounded-3xl bg-charcoal-light cursor-pointer"
                                 style={{
                                     flexShrink: 0,
                                     width: "clamp(300px, 38vw, 680px)",
                                     height: "calc(100vh - 130px)",
+                                    display: "block",
+                                    textDecoration: "none",
                                 }}
                             >
                                 <div
                                     className="absolute inset-0 bg-cover bg-center transition-transform duration-[1200ms] group-hover:scale-105"
-                                    style={{ backgroundImage: `url(${project.image})` }}
+                                    style={{
+                                        backgroundImage: project.image
+                                            ? `url(${project.image})`
+                                            : "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+                                    }}
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-charcoal/20 to-transparent" />
                                 <div className="absolute inset-0 bg-charcoal/10 group-hover:bg-charcoal/30 transition-colors duration-500" />
 
-                                <div className="absolute top-7 left-7">
+                                <div className="absolute top-7 left-7 flex items-center gap-3">
                                     <span className="font-mono text-[11px] text-ivory/40 tracking-[0.25em]">
                                         0{index + 1}
+                                    </span>
+                                    <span className="inline-flex items-center gap-2 font-mono text-[10px] tracking-widest uppercase text-emerald-400 bg-emerald-400/10 border border-emerald-400/30 px-5 py-2 rounded-full">
+                                        <span className="relative flex h-2.5 w-2.5">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
+                                        </span>
+                                        Live
                                     </span>
                                 </div>
 
@@ -190,7 +227,7 @@ export default function Work() {
 
                                 <div className="absolute bottom-7 left-7 right-7">
                                     <span className="font-mono text-[11px] sm:text-xs text-ivory/50 tracking-widest uppercase mb-2 block">
-                                        {project.category} · {project.year}
+                                        {project.category}
                                     </span>
                                     <h3
                                         className="font-display font-bold text-ivory leading-tight"
@@ -199,7 +236,7 @@ export default function Work() {
                                         {project.title}
                                     </h3>
                                 </div>
-                            </div>
+                            </a>
                         ))}
                     </div>
 

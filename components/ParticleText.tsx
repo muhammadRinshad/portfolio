@@ -12,12 +12,12 @@ interface P {
 
 const STEP           = 3;
 const R              = 0.9;
-const SCATTER_MIN    = 6;
-const SCATTER_MAX    = 22;
+const SCATTER_MIN    = 2;
+const SCATTER_MAX    = 9;
 const REPEL_R        = 90;
-const REPEL_F        = 6;
-const SPRING         = 0.07;
-const DAMP           = 0.80;
+const REPEL_F        = 4;
+const SPRING         = 0.05;
+const DAMP           = 0.86;
 const RETURN_STAGGER = 90; // ms between each letter's return (reverse order)
 
 export default function ParticleText({
