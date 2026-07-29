@@ -38,8 +38,8 @@ export default function Education() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, amount: 0.3 }}
                     transition={{ duration: 0.65, ease }}
-                    className="flex items-end justify-between mb-12"
-                    style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", paddingBottom: "2rem" }}
+                    className="flex items-end justify-between mb-16"
+                    style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", paddingBottom: "3rem" }}
                 >
                     <div>
                         <div className="flex items-center gap-4 mb-4">
@@ -57,12 +57,6 @@ export default function Education() {
                             <span className="text-gray-cool opacity-50">EDUCATION</span>
                         </h2>
                     </div>
-                    <span
-                        className="font-display font-black text-ivory/5 leading-none select-none hidden sm:block"
-                        style={{ fontSize: "clamp(4rem, 8vw, 8rem)" }}
-                    >
-                        0{education.length}
-                    </span>
                 </motion.div>
 
                 {/* Entries */}
@@ -74,8 +68,8 @@ export default function Education() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true, amount: 0.15 }}
                             transition={{ duration: 0.6, ease, delay: i * 0.12 }}
-                            className="group grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6 lg:gap-16 py-10 lg:py-12"
-                            style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+                            className="group grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-8 lg:gap-20"
+                            style={{ padding: "3rem 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}
                         >
                             {/* Left — period */}
                             <div className="flex lg:flex-col gap-3 lg:gap-4 lg:pt-1">
@@ -92,11 +86,11 @@ export default function Education() {
                                 >
                                     {item.degree}
                                 </h3>
-                                <p className="font-mono text-xs tracking-wider text-gray-cool uppercase mb-5">
+                                <p className="font-mono text-xs tracking-wider text-gray-cool uppercase mb-7">
                                     {item.institution}
                                 </p>
                                 <div
-                                    className="w-8 mb-5"
+                                    className="w-8 mb-7"
                                     style={{ height: "1px", background: "rgba(255,255,255,0.12)" }}
                                 />
                                 <p className="text-gray-lighter text-sm leading-relaxed max-w-xl">

@@ -179,8 +179,8 @@ export default function Work() {
                                 className="group relative overflow-hidden rounded-3xl bg-charcoal-light cursor-pointer"
                                 style={{
                                     flexShrink: 0,
-                                    width: "clamp(300px, 38vw, 680px)",
-                                    height: "calc(100vh - 130px)",
+                                    width: "min(80vw, calc(100vh - 130px))",
+                                    aspectRatio: "1 / 1",
                                     display: "block",
                                     textDecoration: "none",
                                 }}

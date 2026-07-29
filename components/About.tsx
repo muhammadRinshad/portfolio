@@ -1,14 +1,107 @@
 "use client";
 
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { Fragment, useRef } from "react";
+import { motion, useScroll, useTransform, MotionValue } from "framer-motion";
 
 const PHOTO = "/me%20cartoon%203.webp";
 
-export default function About() {
-    return (
-        <section id="about" className="relative flex flex-col lg:flex-row min-h-screen w-full bg-transparent overflow-hidden">
+const P1 = "MERN Stack Developer with a BCA degree and strong hands-on experience in building full-stack web applications using MongoDB, Express, React, and Node.js.";
+const P2 = "Developed a complete social media application and multiple mini-projects. Built and deployed live landing pages using Next.js, TypeScript, and Framer Motion. A proactive team player with leadership skills and a passion for building scalable web solutions.";
 
+/* Each character is its own component so useTransform is called at component level */
+function Char({
+    char,
+    progress,
+    start,
+    end,
+}: {
+    char: string;
+    progress: MotionValue<number>;
+    start: number;
+    end: number;
+}) {
+    const opacity = useTransform(progress, [start, end], [0.12, 1]);
+    return (
+        <motion.span style={{ opacity, display: "inline-block" }}>
+            {char}
+        </motion.span>
+    );
+}
+
+/*
+ * Renders multiple paragraphs as one continuous letter-by-letter reveal.
+ * Words are wrapped in nowrap spans so lines never break mid-word.
+ */
+function RevealParagraphs({
+    texts,
+    progress,
+    rangeStart,
+    rangeEnd,
+}: {
+    texts: string[];
+    progress: MotionValue<number>;
+    rangeStart: number;
+    rangeEnd: number;
+}) {
+    const total = texts.reduce((sum, t) => sum + t.length, 0);
+    const gap   = (rangeEnd - rangeStart) / total;
+
+    let globalIdx = 0;
+
+    return (
+        <>
+            {texts.map((text, ti) => {
+                const words = text.split(" ");
+                return (
+                    <span key={ti} style={{ display: "block" }}>
+                        {words.map((word, wi) => {
+                            const letters = word.split("").map((char) => {
+                                const i     = globalIdx++;
+                                const start = rangeStart + i * gap;
+                                const end   = Math.min(start + gap * 4, rangeEnd);
+                                return (
+                                    <Char key={i} char={char} progress={progress} start={start} end={end} />
+                                );
+                            });
+                            const hasSpace = wi < words.length - 1;
+                            if (hasSpace) globalIdx++; // advance past the space in the timeline
+                            return (
+                                <Fragment key={wi}>
+                                    <span style={{ display: "inline-block", whiteSpace: "nowrap" }}>
+                                        {letters}
+                                    </span>
+                                    {hasSpace && " "}
+                                </Fragment>
+                            );
+                        })}
+                    </span>
+                );
+            })}
+        </>
+    );
+}
+
+export default function About() {
+    const sectionRef = useRef<HTMLElement>(null);
+
+    /*
+     * "start start" → progress=0 when section top hits viewport top (scroll=0,
+     *   the exact moment the user enters from the hero).
+     * "0.75 start" → progress=1 when 75% of the section has scrolled past the
+     *   viewport top — all text is revealed while still well inside the section.
+     */
+    const { scrollYProgress } = useScroll({
+        target: sectionRef,
+        offset: ["start start", "0.75 start"],
+    });
+
+    return (
+        <section
+            ref={sectionRef}
+            id="about"
+            className="relative flex flex-col lg:flex-row min-h-screen w-full bg-transparent overflow-hidden"
+        >
             {/* Decorative background text */}
             <div className="absolute top-20 lg:top-32 left-0 w-full overflow-hidden leading-none opacity-[0.04] select-none pointer-events-none z-0">
                 <div className="font-display font-black text-[18vw] whitespace-nowrap text-ivory">
@@ -16,7 +109,7 @@ export default function About() {
                 </div>
             </div>
 
-            {/* Text content — full width on mobile, left column on desktop */}
+            {/* Text content */}
             <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -37,44 +130,32 @@ export default function About() {
                         <span className="text-gray-cool italic font-serif">MERN Stack Developer</span>
                     </h2>
 
-                    <div className="space-y-4 text-gray-lighter leading-relaxed font-sans" style={{ fontSize: "clamp(0.9rem, 1.4vw, 1.125rem)" }}>
-                        <p>
-                            MERN Stack Developer with a BCA degree and strong hands-on experience in building
-                            full-stack web applications using MongoDB, Express, React, and Node.js.
-                        </p>
-                        <p>
-                            Developed a complete social media application and multiple mini-projects. Built and
-                            deployed live landing pages using Next.js, TypeScript, and Framer Motion. A proactive
-                            team player with leadership skills and a passion for building scalable web solutions.
-                        </p>
+                    <div
+                        className="space-y-4 text-gray-lighter leading-relaxed font-sans"
+                        style={{ fontSize: "clamp(0.9rem, 1.4vw, 1.125rem)" }}
+                    >
+                        <RevealParagraphs
+                            texts={[P1, P2]}
+                            progress={scrollYProgress}
+                            rangeStart={0}
+                            rangeEnd={1}
+                        />
                     </div>
                 </div>
             </motion.div>
 
-            {/* Mobile photo — absolute background behind text, hidden on desktop */}
+            {/* Mobile photo */}
             <div
                 className="lg:hidden absolute inset-0 pointer-events-none"
                 style={{ opacity: 0.18, zIndex: 1 }}
             >
-                <Image
-                    src={PHOTO}
-                    alt=""
-                    fill
-                    className="object-contain object-bottom"
-                    priority
-                />
+                <Image src={PHOTO} alt="" fill className="object-contain object-bottom" priority />
             </div>
 
-            {/* Desktop photo — right column, hidden on mobile */}
+            {/* Desktop photo */}
             <div className="hidden lg:block relative" style={{ width: "50vw", flexShrink: 0 }}>
                 <div className="absolute inset-0">
-                    <Image
-                        src={PHOTO}
-                        alt="Muhammed Rinshad"
-                        fill
-                        className="object-contain object-bottom"
-                        priority
-                    />
+                    <Image src={PHOTO} alt="Muhammed Rinshad" fill className="object-contain object-bottom" priority />
                 </div>
             </div>
         </section>

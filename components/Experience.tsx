@@ -27,11 +27,6 @@ const experiences = [
 
 const ease: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-const typeColor: Record<string, string> = {
-    Freelance:   "text-emerald-400 bg-emerald-400/10 border-emerald-400/25",
-    Training:    "text-sky-400 bg-sky-400/10 border-sky-400/25",
-    "Full-Time": "text-violet-400 bg-violet-400/10 border-violet-400/25",
-};
 
 export default function Experience() {
     return (
@@ -48,8 +43,8 @@ export default function Experience() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, amount: 0.3 }}
                     transition={{ duration: 0.65, ease }}
-                    className="flex items-end justify-between mb-12"
-                    style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", paddingBottom: "2rem" }}
+                    className="flex items-end justify-between mb-16"
+                    style={{ borderBottom: "1px solid rgba(255,255,255,0.07)", paddingBottom: "3rem" }}
                 >
                     <div>
                         <div className="flex items-center gap-4 mb-4">
@@ -67,12 +62,6 @@ export default function Experience() {
                             <span className="text-gray-cool opacity-50">EXPERIENCE</span>
                         </h2>
                     </div>
-                    <span
-                        className="font-display font-black text-ivory/5 leading-none select-none hidden sm:block"
-                        style={{ fontSize: "clamp(4rem, 8vw, 8rem)" }}
-                    >
-                        0{experiences.length}
-                    </span>
                 </motion.div>
 
                 {/* Entries */}
@@ -84,18 +73,13 @@ export default function Experience() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true, amount: 0.15 }}
                             transition={{ duration: 0.6, ease, delay: i * 0.12 }}
-                            className="group grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6 lg:gap-16 py-10 lg:py-12"
-                            style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+                            className="group grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-8 lg:gap-20"
+                            style={{ padding: "3rem 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}
                         >
                             {/* Left — period + type badge */}
                             <div className="flex lg:flex-col gap-3 lg:gap-4 lg:pt-1 flex-wrap">
                                 <span className="font-mono text-[11px] tracking-widest text-ivory/40 uppercase whitespace-nowrap">
                                     {item.period}
-                                </span>
-                                <span
-                                    className={`self-start font-mono text-[10px] tracking-widest px-4 py-1.5 rounded-full border ${typeColor[item.type] ?? "text-gray-cool bg-gray-cool/10 border-gray-cool/25"}`}
-                                >
-                                    {item.type}
                                 </span>
                             </div>
 
@@ -107,14 +91,14 @@ export default function Experience() {
                                 >
                                     {item.role}
                                 </h3>
-                                <p className="font-mono text-xs tracking-wider text-gray-cool uppercase mb-5">
+                                <p className="font-mono text-xs tracking-wider text-gray-cool uppercase mb-7">
                                     {item.company}
                                 </p>
                                 <div
-                                    className="w-8 mb-5"
+                                    className="w-8 mb-7"
                                     style={{ height: "1px", background: "rgba(255,255,255,0.12)" }}
                                 />
-                                <p className="text-gray-lighter text-sm leading-relaxed mb-6 max-w-xl">
+                                <p className="text-gray-lighter text-sm leading-relaxed mb-8 max-w-xl">
                                     {item.description}
                                 </p>
 
