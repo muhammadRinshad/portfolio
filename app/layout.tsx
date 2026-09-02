@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     siteName: "Muhammed Rinshad Portfolio",
     images: [
       {
-        url: "/me%203.webp",
+        url: "/me%20cartoon%203.webp",
         width: 1200,
         height: 630,
         alt: "Muhammed Rinshad — MERN Stack Developer",
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     title: "Muhammed Rinshad — MERN Stack Developer",
     description:
       "MERN Stack Developer specializing in React, Next.js, Node.js, and full-stack web applications.",
-    images: ["/me%203.webp"],
+    images: ["/me%20cartoon%203.webp"],
   },
 };
 

@@ -55,12 +55,6 @@ export default function Navbar() {
                     <div className="w-full max-w-[100rem] mx-auto px-6 sm:px-12 md:px-20 lg:px-28">
                         <div className="flex justify-between items-center h-20">
 
-                            <Link
-                                href="/"
-                                className="cursor-target font-display font-black text-3xl tracking-tighter hover:opacity-80 transition-opacity z-[60]"
-                            >
-                                RINSHAD<span className="text-gray-cool">.</span>
-                            </Link>
 
                             {/* Desktop links */}
                             <div className="hidden md:flex gap-x-10">
