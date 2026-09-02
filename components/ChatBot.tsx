@@ -33,6 +33,7 @@ export default function ChatBot() {
     const [speaking, setSpeaking] = useState<number | null>(null);
     const [isListening, setIsListening] = useState(false);
     const [streaming, setStreaming] = useState(false);   // true while chunks are flowing in
+    const [slowHint, setSlowHint] = useState(false);    // "Still thinking…" after 8s
     const [autoSpeak, setAutoSpeak] = useState(false);
     const [speakHintDismissed, setSpeakHintDismissed] = useState(false);
     const [recLang, setRecLang] = useState<"en-US" | "ml-IN">("en-US");
@@ -44,6 +45,7 @@ export default function ChatBot() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recognitionRef  = useRef<any>(null);
     const abortRef        = useRef<AbortController | null>(null);
+    const slowTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
     const voicesRef       = useRef<SpeechSynthesisVoice[]>([]);
     // Ref mirrors for use inside async send() without stale closures
     const autoSpeakRef    = useRef(false);
@@ -129,14 +131,21 @@ export default function ChatBot() {
         setInput("");
         setLoading(true);
         setStreaming(false);
+        setSlowHint(false);
 
         // Fresh abort controller for this request
         const controller = new AbortController();
         abortRef.current = controller;
 
+        // Show "Still thinking…" hint after 8 s; hard-abort after 45 s
+        if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+        slowTimerRef.current = setTimeout(() => setSlowHint(true), 8000);
+        const hardTimeout = setTimeout(() => controller.abort("timeout"), 45000);
+
         let accumulated = "";
         let firstChunk = true;
         let aborted = false;
+        let timedOut = false;
 
         try {
             const res = await fetch("/api/chat", {
@@ -162,6 +171,8 @@ export default function ChatBot() {
                     firstChunk = false;
                     setLoading(false);
                     setStreaming(true);
+                    setSlowHint(false);
+                    if (slowTimerRef.current) { clearTimeout(slowTimerRef.current); slowTimerRef.current = null; }
                     setMsgs(prev => {
                         latestBotIdxRef.current = prev.length;   // index of new bot msg
                         return [...prev, { role: "model", text: chunk }];
@@ -185,20 +196,28 @@ export default function ChatBot() {
             }
 
         } catch (err: unknown) {
-            // AbortError = user pressed stop — keep partial text, no error message
             if (err instanceof Error && err.name === "AbortError") {
-                aborted = true;
-                // If we never got a first chunk, remove the pending loading state cleanly
-                if (firstChunk) {
-                    setMsgs(prev => [...prev, { role: "model", text: "Stopped." }]);
+                // Distinguish hard timeout from user pressing stop
+                timedOut = (controller.signal.reason === "timeout");
+                aborted = !timedOut;
+
+                if (timedOut) {
+                    setMsgs(prev => [...prev, { role: "model", text: "⏱ The AI is taking too long to respond. Please try again in a moment." }]);
+                } else {
+                    // User pressed stop — keep any partial text; only add "Stopped." if nothing arrived yet
+                    if (firstChunk) {
+                        setMsgs(prev => [...prev, { role: "model", text: "Stopped." }]);
+                    }
                 }
-                // If chunks arrived, the partial text is already in msgs — nothing more to do
             } else {
                 setMsgs(prev => [...prev, { role: "model", text: "Something went wrong. Please try again." }]);
             }
         } finally {
+            clearTimeout(hardTimeout);
+            if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
             setLoading(false);
             setStreaming(false);
+            setSlowHint(false);
             if (!aborted) abortRef.current = null;
         }
     };
@@ -514,17 +533,40 @@ export default function ChatBot() {
 
                             {/* Typing dots */}
                             {loading && (
-                                <div style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
-                                    <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: C.ivory, color: C.charcoal, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "9px", fontWeight: 700 }}>R</div>
-                                    <div style={{ padding: "13px 16px", borderRadius: "18px 18px 18px 4px", background: "rgba(245,245,240,0.05)", border: "1px solid rgba(245,245,240,0.07)", display: "flex", gap: "5px", alignItems: "center" }}>
-                                        {[0, 1, 2].map(j => (
-                                            <motion.span key={j}
-                                                style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.grayCool, display: "block" }}
-                                                animate={{ y: [0, -5, 0] }}
-                                                transition={{ repeat: Infinity, duration: 0.85, delay: j * 0.18 }}
-                                            />
-                                        ))}
+                                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    <div style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
+                                        <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: C.ivory, color: C.charcoal, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "9px", fontWeight: 700 }}>R</div>
+                                        <div style={{ padding: "13px 16px", borderRadius: "18px 18px 18px 4px", background: "rgba(245,245,240,0.05)", border: "1px solid rgba(245,245,240,0.07)", display: "flex", gap: "5px", alignItems: "center" }}>
+                                            {[0, 1, 2].map(j => (
+                                                <motion.span key={j}
+                                                    style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.grayCool, display: "block" }}
+                                                    animate={{ y: [0, -5, 0] }}
+                                                    transition={{ repeat: Infinity, duration: 0.85, delay: j * 0.18 }}
+                                                />
+                                            ))}
+                                        </div>
                                     </div>
+                                    {/* "Still thinking" hint after 8 s */}
+                                    <AnimatePresence>
+                                        {slowHint && (
+                                            <motion.p
+                                                initial={{ opacity: 0, y: 4 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0 }}
+                                                transition={{ duration: 0.3 }}
+                                                style={{
+                                                    marginLeft: "34px",
+                                                    color: C.grayDarker,
+                                                    fontSize: "10px",
+                                                    fontFamily: "var(--font-mono)",
+                                                    letterSpacing: "0.06em",
+                                                    margin: "0 0 0 34px",
+                                                }}
+                                            >
+                                                Still thinking… tap ■ to stop
+                                            </motion.p>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
                             )}
                             <div ref={bottomRef} />
