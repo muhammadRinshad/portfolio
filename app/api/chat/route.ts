@@ -27,13 +27,12 @@ export async function POST(req: Request) {
         const { message, history } = await req.json();
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-        // Pass apiVersion:"v1" — the default v1beta doesn't expose this key's models
         const model = genAI.getGenerativeModel(
             {
-                model: "gemini-1.5-flash",
+                model: "gemini-3.6-flash",   // confirmed available for this key
                 systemInstruction: SYSTEM_PROMPT,
             },
-            { apiVersion: "v1" }
+            { apiVersion: "v1" }             // v1 exposes the newer model set
         );
 
         const chat = model.startChat({ history: history ?? [] });
