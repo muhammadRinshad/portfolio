@@ -236,7 +236,7 @@ export default function ChatBot() {
             {/* ── Floating button ──────────────────────────── */}
             <motion.button
                 onClick={() => { setOpen(v => !v); window.speechSynthesis.cancel(); setSpeaking(null); }}
-                className="cursor-target fixed bottom-8 right-8 z-[80] w-14 h-14 rounded-full flex items-center justify-center"
+                className="cursor-target fixed bottom-5 right-4 sm:bottom-8 sm:right-8 z-[80] w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center"
                 style={{
                     background: C.ivory,
                     boxShadow: "0 8px 32px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3)",
@@ -266,10 +266,15 @@ export default function ChatBot() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 16, scale: 0.97 }}
                         transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                        className="fixed bottom-28 right-8 z-[79] flex flex-col overflow-hidden"
+                        // Mobile: stretch edge-to-edge with 12px margins on both sides
+                        // sm+: fixed 390px wide, anchored to right
+                        className="fixed z-[79] flex flex-col overflow-hidden
+                                   bottom-28 left-3 right-3
+                                   sm:left-auto sm:right-8 sm:w-[390px]"
                         style={{
-                            width: "min(400px, calc(100vw - 2rem))",
-                            height: "min(580px, calc(100vh - 9rem))",
+                            height: "calc(100vh - 10rem)",   // full height minus button + spacing
+                            maxHeight: "560px",              // cap on large screens
+                            minHeight: "300px",              // floor for tiny phones
                             background: C.charcoalDark,
                             border: "1px solid rgba(245,245,240,0.07)",
                             borderRadius: "20px",
@@ -374,7 +379,7 @@ export default function ChatBot() {
                         </AnimatePresence>
 
                         {/* Messages */}
-                        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px", padding: "18px 16px" }}>
+                        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px", padding: "14px 12px" }}>
                             {msgs.map((m, i) => {
                                 const isUser = m.role === "user";
                                 const isLastBot = !isUser && (i === msgs.length - 1 || msgs[i + 1]?.role === "user");
@@ -453,7 +458,7 @@ export default function ChatBot() {
 
                         {/* Suggestions */}
                         {msgs.length === 1 && (
-                            <div style={{ padding: "6px 16px 12px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
+                            <div style={{ padding: "6px 12px 10px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
                                 {SUGGESTIONS.map(s => (
                                     <button key={s} onClick={() => send(s)}
                                         style={{
@@ -474,7 +479,7 @@ export default function ChatBot() {
                         )}
 
                         {/* Input bar */}
-                        <div style={{ padding: "10px 14px 14px", borderTop: "1px solid rgba(245,245,240,0.06)", flexShrink: 0 }}>
+                        <div style={{ padding: "8px 12px 12px", borderTop: "1px solid rgba(245,245,240,0.06)", flexShrink: 0 }}>
                             <form onSubmit={e => { e.preventDefault(); send(input); }}
                                 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
 
