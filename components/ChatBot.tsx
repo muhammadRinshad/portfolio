@@ -35,6 +35,8 @@ export default function ChatBot() {
     const [autoSpeak, setAutoSpeak] = useState(false);
     const [speakHintDismissed, setSpeakHintDismissed] = useState(false);
     const [recLang, setRecLang] = useState<"en-US" | "ml-IN">("en-US");
+    const [voiceError, setVoiceError] = useState("");
+    const voiceErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const bottomRef    = useRef<HTMLDivElement>(null);
     const inputRef     = useRef<HTMLInputElement>(null);
@@ -62,6 +64,17 @@ export default function ChatBot() {
         return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
     }, []);
 
+    useEffect(() => {
+        return () => { if (voiceErrorTimerRef.current) clearTimeout(voiceErrorTimerRef.current); };
+    }, []);
+
+    /* ─── Voice error helper ──────────────────────── */
+    const showVoiceError = (msg: string) => {
+        setVoiceError(msg);
+        if (voiceErrorTimerRef.current) clearTimeout(voiceErrorTimerRef.current);
+        voiceErrorTimerRef.current = setTimeout(() => setVoiceError(""), 6000);
+    };
+
     /* ─── TTS ─────────────────────────────────────── */
     const isMalayalamText = (text: string) => /[ഀ-ൿ]/.test(text);
 
@@ -74,6 +87,13 @@ export default function ChatBot() {
         const voice =
             voicesRef.current.find(v => v.lang === utt.lang) ||
             voicesRef.current.find(v => v.lang.startsWith(lp)) || null;
+
+        // If text is Malayalam but no Malayalam TTS voice is installed, bail gracefully
+        if (ml && !voice) {
+            showVoiceError("No Malayalam voice installed on this device. Go to System Settings → Language & Speech → add a Malayalam voice to hear audio playback.");
+            return;
+        }
+
         if (voice) utt.voice = voice;
         utt.onend = () => setSpeaking(null);
         utt.onerror = () => setSpeaking(null);
@@ -160,11 +180,15 @@ export default function ChatBot() {
     const startListening = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SR) { alert("Voice input isn't supported in this browser.\nPlease use Chrome or Edge."); return; }
+        if (!SR) {
+            showVoiceError("Voice input isn't supported in this browser. Use Chrome or Edge.");
+            return;
+        }
 
         window.speechSynthesis.cancel();
         setSpeaking(null);
         setInput("");
+        setVoiceError("");
 
         const rec = new SR();
         rec.lang = recLang;
@@ -182,11 +206,34 @@ export default function ChatBot() {
             if (finalText) { setIsListening(false); setInput(""); send(finalText); }
         };
         rec.onend = () => setIsListening(false);
-        rec.onerror = () => { setIsListening(false); setInput(""); };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        rec.onerror = (e: any) => {
+            setIsListening(false);
+            setInput("");
+            const err = e?.error ?? "";
+            if (err === "language-not-supported") {
+                showVoiceError("Malayalam voice isn't supported on this browser. Type in Malayalam — AI will still reply in Malayalam. 🌐");
+            } else if (err === "not-allowed") {
+                showVoiceError("Microphone access denied. Allow mic permissions and try again.");
+            } else if (err !== "no-speech" && err !== "aborted") {
+                showVoiceError("Voice input failed. Please try again.");
+            }
+        };
 
         recognitionRef.current = rec;
-        rec.start();
-        setIsListening(true);
+
+        // iOS Safari may throw synchronously if language is not supported
+        try {
+            rec.start();
+            setIsListening(true);
+        } catch {
+            setIsListening(false);
+            if (recLang === "ml-IN") {
+                showVoiceError("Malayalam voice isn't supported on this browser. Type in Malayalam — AI will still reply in Malayalam. 🌐");
+            } else {
+                showVoiceError("Voice input failed. Please try again.");
+            }
+        }
     };
 
     const stopListening = () => {
@@ -477,6 +524,41 @@ export default function ChatBot() {
                                 ))}
                             </div>
                         )}
+
+                        {/* Voice error banner */}
+                        <AnimatePresence>
+                            {voiceError && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    style={{
+                                        flexShrink: 0,
+                                        display: "flex", alignItems: "flex-start", gap: "8px",
+                                        padding: "8px 14px",
+                                        background: "rgba(184,197,197,0.07)",
+                                        borderTop: "1px solid rgba(245,245,240,0.05)",
+                                    }}
+                                >
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke={C.grayCool} strokeWidth={2} style={{ flexShrink: 0, marginTop: "1px" }}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                                    </svg>
+                                    <p style={{ flex: 1, color: C.grayCool, fontSize: "11px", lineHeight: "1.5", fontFamily: "var(--font-sans)", margin: 0 }}>
+                                        {voiceError}
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setVoiceError("")}
+                                        style={{ background: "none", border: "none", cursor: "pointer", color: C.grayDarker, padding: "0 0 0 4px", flexShrink: 0 }}
+                                    >
+                                        <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
                         {/* Input bar */}
                         <div style={{ padding: "8px 12px 12px", borderTop: "1px solid rgba(245,245,240,0.06)", flexShrink: 0 }}>
