@@ -40,6 +40,30 @@ export default function ChatBot() {
     const [voiceError, setVoiceError] = useState("");
     const voiceErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    /* ─── Daily client-side message limit ────────────
+       20 messages per day per browser. Soft guard on top of server rate limit. */
+    const DAILY_LIMIT = 20;
+    const getLimitData = () => {
+        try {
+            const raw = localStorage.getItem("chat_limit");
+            if (!raw) return { count: 0, day: "" };
+            return JSON.parse(raw) as { count: number; day: string };
+        } catch { return { count: 0, day: "" }; }
+    };
+    const today = () => new Date().toISOString().slice(0, 10);
+    const getMsgCount = () => {
+        const d = getLimitData();
+        return d.day === today() ? d.count : 0;
+    };
+    const incrementMsgCount = () => {
+        const d = getLimitData();
+        const count = d.day === today() ? d.count + 1 : 1;
+        try { localStorage.setItem("chat_limit", JSON.stringify({ count, day: today() })); } catch { /* ignore */ }
+        return count;
+    };
+    const [msgCount, setMsgCount] = useState(0);
+    const isLimitReached = msgCount >= DAILY_LIMIT;
+
     const bottomRef    = useRef<HTMLDivElement>(null);
     const inputRef     = useRef<HTMLInputElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,6 +76,9 @@ export default function ChatBot() {
     const latestBotIdxRef = useRef(-1);
 
     useEffect(() => { autoSpeakRef.current = autoSpeak; }, [autoSpeak]);
+
+    // Initialise daily counter from localStorage on mount
+    useEffect(() => { setMsgCount(getMsgCount()); }, []);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -125,11 +152,15 @@ export default function ChatBot() {
 
     const send = async (text: string, forceSpeak = false) => {
         if (!text.trim() || loading || streaming) return;
+        if (isLimitReached) return;   // hard stop — UI already shows the wall
         const userMsg: Msg = { role: "user", text: text.trim() };
         const next = [...msgs, userMsg];
         setMsgs(next);
         setInput("");
         setLoading(true);
+        // Increment and sync daily counter
+        const newCount = incrementMsgCount();
+        setMsgCount(newCount);
         setStreaming(false);
         setSlowHint(false);
 
@@ -155,6 +186,12 @@ export default function ChatBot() {
                 signal: controller.signal,
             });
 
+            if (res.status === 429) {
+                const data = await res.json().catch(() => ({}));
+                const mins = data.resetInMin ?? 60;
+                setMsgs(prev => [...prev, { role: "model", text: `🚫 You've sent too many messages. Please wait about ${mins} minute${mins !== 1 ? "s" : ""} and try again.` }]);
+                return;
+            }
             if (!res.ok || !res.body) throw new Error("Request failed");
 
             const reader = res.body.getReader();
@@ -631,6 +668,32 @@ export default function ChatBot() {
 
                         {/* Input bar */}
                         <div style={{ padding: "8px 12px 12px", borderTop: "1px solid rgba(245,245,240,0.06)", flexShrink: 0 }}>
+
+                            {/* Daily limit wall */}
+                            {isLimitReached ? (
+                                <div style={{
+                                    display: "flex", flexDirection: "column", alignItems: "center", gap: "8px",
+                                    padding: "14px 16px",
+                                    borderRadius: "12px",
+                                    background: "rgba(245,245,240,0.04)",
+                                    border: "1px solid rgba(245,245,240,0.09)",
+                                    textAlign: "center",
+                                }}>
+                                    <span style={{ fontSize: "18px" }}>🚫</span>
+                                    <p style={{ color: C.grayLighter, fontSize: "12px", lineHeight: "1.5", margin: 0, fontFamily: "var(--font-sans)" }}>
+                                        You&apos;ve reached today&apos;s limit of <strong>{DAILY_LIMIT} messages</strong>.<br />
+                                        Come back tomorrow or reach Rinshad directly.
+                                    </p>
+                                    <a href="mailto:muhammadrinshad13@gmail.com"
+                                        style={{
+                                            color: C.ivory, fontSize: "11px",
+                                            fontFamily: "var(--font-mono)", letterSpacing: "0.06em",
+                                            textDecoration: "none", opacity: 0.7,
+                                        }}>
+                                        muhammadrinshad13@gmail.com →
+                                    </a>
+                                </div>
+                            ) : (
                             <form onSubmit={e => { e.preventDefault(); send(input); }}
                                 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
 
@@ -796,6 +859,20 @@ export default function ChatBot() {
                                     )}
                                 </AnimatePresence>
                             </form>
+                            )} {/* end isLimitReached ternary */}
+
+                            {/* Remaining count — shown when not yet limited */}
+                            {!isLimitReached && msgCount > 0 && (
+                                <p style={{
+                                    textAlign: "right", marginTop: "4px",
+                                    color: msgCount >= DAILY_LIMIT - 5 ? "rgba(184,197,197,0.55)" : "transparent",
+                                    fontSize: "9px", fontFamily: "var(--font-mono)",
+                                    letterSpacing: "0.05em", pointerEvents: "none",
+                                    transition: "color 0.3s",
+                                }}>
+                                    {DAILY_LIMIT - msgCount} messages left today
+                                </p>
+                            )}
                         </div>
                     </motion.div>
                 )}

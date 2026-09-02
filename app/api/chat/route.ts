@@ -22,8 +22,54 @@ About Rinshad (Muhammed Rinshad):
 
 Keep replies short and friendly. If asked something unrelated to Rinshad or web dev, politely steer back.`;
 
+/* ─── IP-based rate limiter (in-memory, resets on cold start) ─────────────
+   30 requests per IP per hour. Prevents API abuse without needing Redis.    */
+interface RateEntry { count: number; windowStart: number; }
+const rateLimitMap = new Map<string, RateEntry>();
+const RATE_LIMIT  = 30;                  // max messages per window
+const RATE_WINDOW = 60 * 60 * 1000;     // 1 hour in ms
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number; resetInMin: number } {
+    const now = Date.now();
+    const entry = rateLimitMap.get(ip);
+
+    if (!entry || now - entry.windowStart > RATE_WINDOW) {
+        rateLimitMap.set(ip, { count: 1, windowStart: now });
+        return { allowed: true, remaining: RATE_LIMIT - 1, resetInMin: 60 };
+    }
+
+    if (entry.count >= RATE_LIMIT) {
+        const resetInMin = Math.ceil((RATE_WINDOW - (now - entry.windowStart)) / 60000);
+        return { allowed: false, remaining: 0, resetInMin };
+    }
+
+    entry.count++;
+    const resetInMin = Math.ceil((RATE_WINDOW - (now - entry.windowStart)) / 60000);
+    return { allowed: true, remaining: RATE_LIMIT - entry.count, resetInMin };
+}
+
+/* Periodically clear stale entries so the Map doesn't grow forever */
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, entry] of rateLimitMap) {
+        if (now - entry.windowStart > RATE_WINDOW) rateLimitMap.delete(ip);
+    }
+}, RATE_WINDOW);
+
 export async function POST(req: Request) {
     try {
+        /* ── Rate limit check ── */
+        const forwarded = req.headers.get("x-forwarded-for");
+        const ip = forwarded?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
+        const rl = checkRateLimit(ip);
+
+        if (!rl.allowed) {
+            return Response.json(
+                { error: "rate_limited", resetInMin: rl.resetInMin },
+                { status: 429 }
+            );
+        }
+
         const { message, history } = await req.json();
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -61,6 +107,7 @@ export async function POST(req: Request) {
                 "Content-Type": "text/plain; charset=utf-8",
                 "Cache-Control": "no-cache, no-store",
                 "X-Accel-Buffering": "no",   // prevent nginx from buffering the stream
+                "X-RateLimit-Remaining": String(rl.remaining),
             },
         });
     } catch (err: unknown) {
