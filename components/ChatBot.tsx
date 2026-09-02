@@ -21,7 +21,8 @@ export default function ChatBot() {
     const [loading, setLoading] = useState(false);
     const [speaking, setSpeaking] = useState<number | null>(null);
     const [isListening, setIsListening] = useState(false);
-    const [autoSpeak, setAutoSpeak] = useState(true);
+    const [autoSpeak, setAutoSpeak] = useState(false);
+    const [speakHintDismissed, setSpeakHintDismissed] = useState(false);
     const [recLang, setRecLang] = useState<"en-US" | "ml-IN">("en-US");
     const bottomRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -290,6 +291,40 @@ export default function ChatBot() {
                                 </svg>
                             </button>
                         </div>
+
+                        {/* Auto-speak hint — shown until dismissed or turned on */}
+                        <AnimatePresence>
+                            {!autoSpeak && !speakHintDismissed && (
+                                <motion.button
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.22 }}
+                                    type="button"
+                                    onClick={() => { setAutoSpeak(true); setSpeakHintDismissed(true); }}
+                                    style={{
+                                        width: "100%",
+                                        display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+                                        padding: "7px 16px",
+                                        background: "rgba(131,58,180,0.15)",
+                                        borderTop: "none",
+                                        borderBottom: "1px solid rgba(131,58,180,0.2)",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        flexShrink: 0,
+                                        color: "rgba(192,132,252,0.9)",
+                                        fontSize: "11px",
+                                        letterSpacing: "0.02em",
+                                    }}
+                                >
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ flexShrink: 0 }}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M19.07 4.929a10 10 0 010 14.142M12 5L7 9H4a1 1 0 00-1 1v4a1 1 0 001 1h3l5 4V5z" />
+                                    </svg>
+                                    Tap to enable voice replies
+                                    <span style={{ opacity: 0.5, fontSize: "10px" }}>✕</span>
+                                </motion.button>
+                            )}
+                        </AnimatePresence>
 
                         {/* Messages */}
                         <div
