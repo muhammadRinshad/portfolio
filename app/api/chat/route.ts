@@ -27,11 +27,14 @@ export async function POST(req: Request) {
         const { message, history } = await req.json();
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-        // gemini-2.0-flash-exp is widely available on free-tier AI Studio keys
-        const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash-exp",
-            systemInstruction: SYSTEM_PROMPT,
-        });
+        // Pass apiVersion:"v1" — the default v1beta doesn't expose this key's models
+        const model = genAI.getGenerativeModel(
+            {
+                model: "gemini-1.5-flash",
+                systemInstruction: SYSTEM_PROMPT,
+            },
+            { apiVersion: "v1" }
+        );
 
         const chat = model.startChat({ history: history ?? [] });
 
