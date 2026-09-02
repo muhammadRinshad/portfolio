@@ -95,9 +95,14 @@ export default function ChatBot() {
     };
 
     const toggleListening = () => {
+        // If already listening: stop + send whatever is in the input
         if (isListening) {
             recognitionRef.current?.stop();
             setIsListening(false);
+            // send() checks trim, so if interim text is in input it will send
+            if (input.trim()) {
+                send(input.trim());
+            }
             return;
         }
 
@@ -108,23 +113,38 @@ export default function ChatBot() {
             return;
         }
 
-        // Stop any ongoing speech so mic doesn't pick it up
+        // Stop any ongoing TTS so mic doesn't pick it up
         window.speechSynthesis.cancel();
         setSpeaking(null);
+        setInput(""); // clear input before recording
 
         const rec = new SR();
         rec.lang = "en-US";
-        rec.interimResults = false;
+        rec.interimResults = true;   // show live transcript in input field
         rec.maxAlternatives = 1;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         rec.onresult = (e: any) => {
-            const transcript: string = e.results[0][0].transcript;
-            setIsListening(false);
-            send(transcript);
+            // Build full transcript from all result segments
+            let interim = "";
+            let finalText = "";
+            for (let i = 0; i < e.results.length; i++) {
+                const text = e.results[i][0].transcript;
+                if (e.results[i].isFinal) finalText += text;
+                else interim += text;
+            }
+            // Show live preview in input field
+            setInput(finalText || interim);
+
+            // Auto-send once a final result arrives
+            if (finalText) {
+                setIsListening(false);
+                setInput("");
+                send(finalText);
+            }
         };
         rec.onend = () => setIsListening(false);
-        rec.onerror = () => setIsListening(false);
+        rec.onerror = () => { setIsListening(false); setInput(""); };
 
         recognitionRef.current = rec;
         rec.start();
@@ -405,38 +425,52 @@ export default function ChatBot() {
                                     ref={inputRef}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
-                                    placeholder={isListening ? "Listening…" : "Message…"}
+                                    placeholder={isListening ? "Speak now…" : "Message…"}
+                                    readOnly={isListening && !input}
                                     style={{
                                         flex: 1,
-                                        background: "rgba(255,255,255,0.07)",
+                                        background: isListening ? "rgba(255,80,80,0.08)" : "rgba(255,255,255,0.07)",
                                         color: "#fff",
                                         fontSize: "14px",
                                         outline: "none",
-                                        border: "none",
+                                        border: isListening ? "1px solid rgba(255,80,80,0.3)" : "1px solid transparent",
                                         borderRadius: "24px",
                                         padding: "10px 18px",
+                                        transition: "background 0.25s, border 0.25s",
                                     }}
                                     className="placeholder-white/30"
                                 />
 
-                                {/* Send button */}
+                                {/* Send button — enabled while listening so user can tap to stop & send */}
                                 <button
                                     type="submit"
-                                    disabled={!input.trim() || loading}
+                                    disabled={(!input.trim() && !isListening) || loading}
+                                    onClick={isListening && !input.trim() ? (e) => { e.preventDefault(); toggleListening(); } : undefined}
                                     style={{
                                         width: "38px", height: "38px", borderRadius: "50%",
-                                        background: "linear-gradient(135deg,#833ab4,#fd1d1d)",
+                                        background: isListening
+                                            ? "linear-gradient(135deg,#ff5555,#ff2222)"
+                                            : "linear-gradient(135deg,#833ab4,#fd1d1d)",
                                         display: "flex", alignItems: "center", justifyContent: "center",
                                         flexShrink: 0,
-                                        opacity: !input.trim() || loading ? 0.32 : 1,
-                                        transition: "opacity 0.2s",
+                                        opacity: (!input.trim() && !isListening) || loading ? 0.32 : 1,
+                                        transition: "opacity 0.2s, background 0.25s",
                                         border: "none",
-                                        cursor: !input.trim() || loading ? "not-allowed" : "pointer",
+                                        cursor: ((!input.trim() && !isListening) || loading) ? "not-allowed" : "pointer",
                                     }}
+                                    title={isListening ? "Stop and send" : "Send"}
                                 >
-                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" style={{ transform: "translateX(1px)" }}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                    </svg>
+                                    {isListening ? (
+                                        /* Stop icon when recording */
+                                        <svg width="14" height="14" fill="#fff" viewBox="0 0 24 24">
+                                            <rect x="4" y="4" width="16" height="16" rx="2" />
+                                        </svg>
+                                    ) : (
+                                        /* Arrow icon normally */
+                                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" style={{ transform: "translateX(1px)" }}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                        </svg>
+                                    )}
                                 </button>
                             </form>
                         </div>
