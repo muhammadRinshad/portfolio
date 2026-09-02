@@ -32,6 +32,7 @@ export default function ChatBot() {
     const [loading, setLoading] = useState(false);
     const [speaking, setSpeaking] = useState<number | null>(null);
     const [isListening, setIsListening] = useState(false);
+    const [streaming, setStreaming] = useState(false);   // true while chunks are flowing in
     const [autoSpeak, setAutoSpeak] = useState(false);
     const [speakHintDismissed, setSpeakHintDismissed] = useState(false);
     const [recLang, setRecLang] = useState<"en-US" | "ml-IN">("en-US");
@@ -42,6 +43,7 @@ export default function ChatBot() {
     const inputRef     = useRef<HTMLInputElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recognitionRef  = useRef<any>(null);
+    const abortRef        = useRef<AbortController | null>(null);
     const voicesRef       = useRef<SpeechSynthesisVoice[]>([]);
     // Ref mirrors for use inside async send() without stale closures
     const autoSpeakRef    = useRef(false);
@@ -115,22 +117,33 @@ export default function ChatBot() {
     };
 
     /* ─── Send with streaming ──────────────────────── */
-    const send = async (text: string) => {
-        if (!text.trim() || loading) return;
+    const stopGeneration = () => {
+        abortRef.current?.abort();
+    };
+
+    const send = async (text: string, forceSpeak = false) => {
+        if (!text.trim() || loading || streaming) return;
         const userMsg: Msg = { role: "user", text: text.trim() };
         const next = [...msgs, userMsg];
         setMsgs(next);
         setInput("");
         setLoading(true);
+        setStreaming(false);
+
+        // Fresh abort controller for this request
+        const controller = new AbortController();
+        abortRef.current = controller;
 
         let accumulated = "";
         let firstChunk = true;
+        let aborted = false;
 
         try {
             const res = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: text.trim(), history: buildHistory(next) }),
+                signal: controller.signal,
             });
 
             if (!res.ok || !res.body) throw new Error("Request failed");
@@ -148,6 +161,7 @@ export default function ChatBot() {
                 if (firstChunk) {
                     firstChunk = false;
                     setLoading(false);
+                    setStreaming(true);
                     setMsgs(prev => {
                         latestBotIdxRef.current = prev.length;   // index of new bot msg
                         return [...prev, { role: "model", text: chunk }];
@@ -165,14 +179,27 @@ export default function ChatBot() {
             }
 
             // Auto-speak the COMPLETE reply (not chunk-by-chunk)
-            if (autoSpeakRef.current && accumulated && latestBotIdxRef.current >= 0) {
+            // forceSpeak = true when message was sent via mic (always speak the reply)
+            if ((autoSpeakRef.current || forceSpeak) && accumulated && latestBotIdxRef.current >= 0) {
                 buildAndSpeak(accumulated, latestBotIdxRef.current);
             }
 
-        } catch {
-            setMsgs(prev => [...prev, { role: "model", text: "Something went wrong. Please try again." }]);
+        } catch (err: unknown) {
+            // AbortError = user pressed stop — keep partial text, no error message
+            if (err instanceof Error && err.name === "AbortError") {
+                aborted = true;
+                // If we never got a first chunk, remove the pending loading state cleanly
+                if (firstChunk) {
+                    setMsgs(prev => [...prev, { role: "model", text: "Stopped." }]);
+                }
+                // If chunks arrived, the partial text is already in msgs — nothing more to do
+            } else {
+                setMsgs(prev => [...prev, { role: "model", text: "Something went wrong. Please try again." }]);
+            }
         } finally {
             setLoading(false);
+            setStreaming(false);
+            if (!aborted) abortRef.current = null;
         }
     };
 
@@ -203,7 +230,7 @@ export default function ChatBot() {
                 if (e.results[i].isFinal) finalText += t; else interim += t;
             }
             setInput(finalText || interim);
-            if (finalText) { setIsListening(false); setInput(""); send(finalText); }
+            if (finalText) { setIsListening(false); setInput(""); send(finalText, true); }
         };
         rec.onend = () => setIsListening(false);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -241,7 +268,7 @@ export default function ChatBot() {
         // onresult fires with isFinal after stop() — if interim text is in input, send it
         setTimeout(() => {
             setInput(prev => {
-                if (prev.trim()) { send(prev.trim()); return ""; }
+                if (prev.trim()) { send(prev.trim(), true); return ""; }
                 return prev;
             });
         }, 400);
@@ -672,26 +699,60 @@ export default function ChatBot() {
                                     className="placeholder-[#4A5454]"
                                 />
 
-                                {/* Send button */}
-                                <button
-                                    type="submit"
-                                    disabled={!input.trim() || loading}
-                                    title="Send"
-                                    style={{
-                                        width: "36px", height: "36px", borderRadius: "50%",
-                                        background: C.ivory,
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        flexShrink: 0, border: "none",
-                                        opacity: !input.trim() || loading ? 0.22 : 1,
-                                        transition: "opacity 0.2s",
-                                        cursor: !input.trim() || loading ? "not-allowed" : "pointer",
-                                        marginBottom: "2px",
-                                    }}
-                                >
-                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={C.charcoal} strokeWidth={2.5} style={{ transform: "translateX(1px)" }}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                    </svg>
-                                </button>
+                                {/* Stop button (visible while loading or streaming) */}
+                                <AnimatePresence mode="wait" initial={false}>
+                                    {(loading || streaming) ? (
+                                        <motion.button
+                                            key="stop"
+                                            type="button"
+                                            onClick={stopGeneration}
+                                            initial={{ opacity: 0, scale: 0.8 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.8 }}
+                                            transition={{ duration: 0.15 }}
+                                            title="Stop generating"
+                                            style={{
+                                                width: "36px", height: "36px", borderRadius: "50%",
+                                                background: "rgba(245,245,240,0.1)",
+                                                border: "1px solid rgba(245,245,240,0.2)",
+                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                flexShrink: 0, cursor: "pointer",
+                                                color: C.grayLighter,
+                                                marginBottom: "2px",
+                                            }}
+                                        >
+                                            {/* Stop square icon */}
+                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                                                <rect x="4" y="4" width="16" height="16" rx="2" />
+                                            </svg>
+                                        </motion.button>
+                                    ) : (
+                                        <motion.button
+                                            key="send"
+                                            type="submit"
+                                            disabled={!input.trim()}
+                                            initial={{ opacity: 0, scale: 0.8 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.8 }}
+                                            transition={{ duration: 0.15 }}
+                                            title="Send"
+                                            style={{
+                                                width: "36px", height: "36px", borderRadius: "50%",
+                                                background: C.ivory,
+                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                flexShrink: 0, border: "none",
+                                                opacity: !input.trim() ? 0.22 : 1,
+                                                transition: "opacity 0.2s",
+                                                cursor: !input.trim() ? "not-allowed" : "pointer",
+                                                marginBottom: "2px",
+                                            }}
+                                        >
+                                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={C.charcoal} strokeWidth={2.5} style={{ transform: "translateX(1px)" }}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                            </svg>
+                                        </motion.button>
+                                    )}
+                                </AnimatePresence>
                             </form>
                         </div>
                     </motion.div>
