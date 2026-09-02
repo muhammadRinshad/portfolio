@@ -3,6 +3,18 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Portfolio palette
+const C = {
+    charcoal:      "#1A1A1D",
+    charcoalLight: "#2D2D30",
+    charcoalDark:  "#0F0F10",
+    grayCool:      "#6E7C7C",
+    grayDarker:    "#4A5454",
+    grayLighter:   "#B8C5C5",
+    ivory:         "#F5F5F0",
+    ivoryWarm:     "#FAFAF8",
+};
+
 type Role = "user" | "model";
 interface Msg { role: Role; text: string; }
 
@@ -39,7 +51,6 @@ export default function ChatBot() {
         if (open) setTimeout(() => inputRef.current?.focus(), 300);
     }, [open]);
 
-    // Pre-load TTS voices (they load async in browsers)
     useEffect(() => {
         const load = () => { voicesRef.current = window.speechSynthesis.getVoices(); };
         load();
@@ -47,21 +58,18 @@ export default function ChatBot() {
         return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
     }, []);
 
-    // Detect if text is primarily Malayalam (Unicode block U+0D00–U+0D7F)
     const isMalayalamText = (text: string) => /[ഀ-ൿ]/.test(text);
 
-    // Build and speak a utterance with correct lang + voice
     const buildAndSpeak = (text: string, idx: number) => {
         window.speechSynthesis.cancel();
         const utt = new SpeechSynthesisUtterance(text);
         const ml = isMalayalamText(text);
         utt.lang = ml ? "ml-IN" : "en-US";
-        // Pick the best matching voice
         const voices = voicesRef.current;
         const langPrefix = ml ? "ml" : "en";
         const voice =
-            voices.find(v => v.lang === utt.lang) ||           // exact match
-            voices.find(v => v.lang.startsWith(langPrefix)) || // prefix match
+            voices.find(v => v.lang === utt.lang) ||
+            voices.find(v => v.lang.startsWith(langPrefix)) ||
             null;
         if (voice) utt.voice = voice;
         utt.onend = () => setSpeaking(null);
@@ -70,7 +78,7 @@ export default function ChatBot() {
         window.speechSynthesis.speak(utt);
     };
 
-    // Auto-speak new bot messages
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         const last = msgs[msgs.length - 1];
         const isNew = msgs.length > prevMsgCountRef.current;
@@ -78,8 +86,7 @@ export default function ChatBot() {
         if (isNew && autoSpeak && last?.role === "model") {
             buildAndSpeak(last.text, msgs.length - 1);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [msgs, autoSpeak]);
+    }, [msgs, autoSpeak]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const buildHistory = (messages: Msg[]) => {
         const withoutLast = messages.slice(0, -1);
@@ -92,11 +99,7 @@ export default function ChatBot() {
     };
 
     const speakToggle = (text: string, idx: number) => {
-        if (speaking === idx) {
-            window.speechSynthesis.cancel();
-            setSpeaking(null);
-            return;
-        }
+        if (speaking === idx) { window.speechSynthesis.cancel(); setSpeaking(null); return; }
         buildAndSpeak(text, idx);
     };
 
@@ -123,57 +126,34 @@ export default function ChatBot() {
     };
 
     const toggleListening = () => {
-        // If already listening: stop + send whatever is in the input
         if (isListening) {
             recognitionRef.current?.stop();
             setIsListening(false);
-            // send() checks trim, so if interim text is in input it will send
-            if (input.trim()) {
-                send(input.trim());
-            }
+            if (input.trim()) send(input.trim());
             return;
         }
-
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SR) {
-            alert("Voice input isn't supported in this browser.\nPlease use Chrome or Edge.");
-            return;
-        }
-
-        // Stop any ongoing TTS so mic doesn't pick it up
+        if (!SR) { alert("Voice input isn't supported in this browser.\nPlease use Chrome or Edge."); return; }
         window.speechSynthesis.cancel();
         setSpeaking(null);
-        setInput(""); // clear input before recording
-
+        setInput("");
         const rec = new SR();
-        rec.lang = recLang;          // "en-US" or "ml-IN" based on toggle
-        rec.interimResults = true;   // show live transcript in input field
+        rec.lang = recLang;
+        rec.interimResults = true;
         rec.maxAlternatives = 1;
-
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         rec.onresult = (e: any) => {
-            // Build full transcript from all result segments
-            let interim = "";
-            let finalText = "";
+            let interim = "", finalText = "";
             for (let i = 0; i < e.results.length; i++) {
-                const text = e.results[i][0].transcript;
-                if (e.results[i].isFinal) finalText += text;
-                else interim += text;
+                const t = e.results[i][0].transcript;
+                if (e.results[i].isFinal) finalText += t; else interim += t;
             }
-            // Show live preview in input field
             setInput(finalText || interim);
-
-            // Auto-send once a final result arrives
-            if (finalText) {
-                setIsListening(false);
-                setInput("");
-                send(finalText);
-            }
+            if (finalText) { setIsListening(false); setInput(""); send(finalText); }
         };
         rec.onend = () => setIsListening(false);
         rec.onerror = () => { setIsListening(false); setInput(""); };
-
         recognitionRef.current = rec;
         rec.start();
         setIsListening(true);
@@ -187,211 +167,226 @@ export default function ChatBot() {
         setIsListening(false);
     };
 
+    /* ─── Icon helpers ─────────────────────────────── */
+    const IconSpeakerOn = () => (
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.536 8.464a5 5 0 010 7.072M19.07 4.929a10 10 0 010 14.142M12 5L7 9H4a1 1 0 00-1 1v4a1 1 0 001 1h3l5 4V5z" />
+        </svg>
+    );
+    const IconSpeakerOff = () => (
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+        </svg>
+    );
+
     return (
         <>
-            {/* Floating button */}
+            {/* ── Floating button ──────────────────────────── */}
             <motion.button
-                onClick={() => { setOpen((v) => !v); window.speechSynthesis.cancel(); setSpeaking(null); }}
-                className="cursor-target fixed bottom-8 right-8 z-[80] w-14 h-14 rounded-full flex items-center justify-center shadow-2xl"
-                style={{ background: "linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)" }}
-                whileHover={{ scale: 1.08 }}
-                whileTap={{ scale: 0.94 }}
+                onClick={() => { setOpen(v => !v); window.speechSynthesis.cancel(); setSpeaking(null); }}
+                className="cursor-target fixed bottom-8 right-8 z-[80] w-14 h-14 rounded-full flex items-center justify-center"
+                style={{
+                    background: C.ivory,
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3)",
+                }}
+                whileHover={{ scale: 1.07 }}
+                whileTap={{ scale: 0.93 }}
                 aria-label="Open chat"
             >
                 <AnimatePresence mode="wait" initial={false}>
                     {open ? (
-                        <motion.svg key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.18 }} className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        <motion.svg key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.16 }} width="18" height="18" fill="none" viewBox="0 0 24 24" stroke={C.charcoal} strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </motion.svg>
                     ) : (
-                        <motion.svg key="chat" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.18 }} className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        <motion.svg key="chat" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.16 }} width="18" height="18" fill="none" viewBox="0 0 24 24" stroke={C.charcoal} strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                         </motion.svg>
                     )}
                 </AnimatePresence>
             </motion.button>
 
-            {/* Chat window */}
+            {/* ── Chat window ───────────────────────────────── */}
             <AnimatePresence>
                 {open && (
                     <motion.div
-                        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+                        initial={{ opacity: 0, y: 16, scale: 0.97 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 20, scale: 0.97 }}
-                        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                        className="fixed bottom-28 right-8 z-[79] flex flex-col rounded-3xl overflow-hidden"
+                        exit={{ opacity: 0, y: 16, scale: 0.97 }}
+                        transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                        className="fixed bottom-28 right-8 z-[79] flex flex-col overflow-hidden"
                         style={{
                             width: "min(400px, calc(100vw - 2rem))",
                             height: "min(580px, calc(100vh - 9rem))",
-                            background: "#0e0e0e",
-                            border: "1px solid rgba(255,255,255,0.1)",
-                            boxShadow: "0 32px 80px rgba(0,0,0,0.7)",
+                            background: C.charcoalDark,
+                            border: `1px solid rgba(245,245,240,0.07)`,
+                            borderRadius: "20px",
+                            boxShadow: "0 40px 100px rgba(0,0,0,0.75), 0 8px 24px rgba(0,0,0,0.5)",
                         }}
                     >
                         {/* Header */}
-                        <div
-                            className="flex items-center gap-3 px-5 py-4 flex-shrink-0"
-                            style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#111" }}
-                        >
+                        <div style={{
+                            display: "flex", alignItems: "center", gap: "12px",
+                            padding: "14px 18px",
+                            background: C.charcoal,
+                            borderBottom: `1px solid rgba(245,245,240,0.06)`,
+                            flexShrink: 0,
+                        }}>
                             {/* Avatar */}
-                            <div className="relative flex-shrink-0">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ background: "linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)" }}>
-                                    R
-                                </div>
-                                <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-400 border-2 border-[#111]" />
+                            <div style={{ position: "relative", flexShrink: 0 }}>
+                                <div style={{
+                                    width: "38px", height: "38px", borderRadius: "50%",
+                                    background: C.ivory,
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: "13px", fontWeight: 700, color: C.charcoal,
+                                    fontFamily: "var(--font-display)",
+                                }}>R</div>
+                                <span style={{
+                                    position: "absolute", bottom: 0, right: 0,
+                                    width: "10px", height: "10px", borderRadius: "50%",
+                                    background: C.grayCool,
+                                    border: `2px solid ${C.charcoal}`,
+                                }} />
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-white text-sm font-semibold leading-none mb-1">Rinshad AI</p>
-                                <p className="text-green-400 text-[11px]">● Active now</p>
+
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ color: C.ivory, fontSize: "13px", fontWeight: 600, lineHeight: 1, marginBottom: "4px", fontFamily: "var(--font-display)" }}>
+                                    Rinshad AI
+                                </p>
+                                <p style={{ color: C.grayCool, fontSize: "10px", fontFamily: "var(--font-mono)", letterSpacing: "0.06em" }}>
+                                    ● ONLINE
+                                </p>
                             </div>
 
                             {/* Auto-speak toggle */}
                             <button
-                                onClick={() => {
-                                    setAutoSpeak((v) => !v);
-                                    if (autoSpeak) { window.speechSynthesis.cancel(); setSpeaking(null); }
-                                }}
-                                title={autoSpeak ? "Auto-speak on — click to mute" : "Auto-speak off — click to enable"}
+                                onClick={() => { setAutoSpeak(v => !v); if (autoSpeak) { window.speechSynthesis.cancel(); setSpeaking(null); } }}
+                                title={autoSpeak ? "Voice replies on — click to mute" : "Voice replies off — click to enable"}
                                 style={{
-                                    width: "32px", height: "32px", borderRadius: "50%",
+                                    width: "30px", height: "30px", borderRadius: "50%",
                                     display: "flex", alignItems: "center", justifyContent: "center",
                                     background: "transparent", border: "none", cursor: "pointer",
-                                    color: autoSpeak ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.22)",
-                                    transition: "color 0.2s, background 0.2s",
+                                    color: autoSpeak ? C.grayLighter : C.grayDarker,
+                                    transition: "color 0.2s",
                                 }}
-                                className="hover:bg-white/10"
                             >
-                                {autoSpeak ? (
-                                    /* Speaker with waves */
-                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M19.07 4.929a10 10 0 010 14.142M12 5L7 9H4a1 1 0 00-1 1v4a1 1 0 001 1h3l5 4V5z" />
-                                    </svg>
-                                ) : (
-                                    /* Speaker muted */
-                                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                                    </svg>
-                                )}
+                                {autoSpeak ? <IconSpeakerOn /> : <IconSpeakerOff />}
                             </button>
 
                             {/* Close */}
                             <button
                                 onClick={closeChat}
                                 style={{
-                                    width: "32px", height: "32px", borderRadius: "50%",
+                                    width: "30px", height: "30px", borderRadius: "50%",
                                     display: "flex", alignItems: "center", justifyContent: "center",
                                     background: "transparent", border: "none", cursor: "pointer",
-                                    color: "rgba(255,255,255,0.35)",
+                                    color: C.grayDarker,
+                                    transition: "color 0.2s",
                                 }}
-                                className="hover:text-white hover:bg-white/10 transition-all"
+                                onMouseEnter={e => (e.currentTarget.style.color = C.grayLighter)}
+                                onMouseLeave={e => (e.currentTarget.style.color = C.grayDarker)}
                             >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
 
-                        {/* Auto-speak hint — shown until dismissed or turned on */}
+                        {/* Voice hint banner */}
                         <AnimatePresence>
                             {!autoSpeak && !speakHintDismissed && (
                                 <motion.button
                                     initial={{ opacity: 0, height: 0 }}
                                     animate={{ opacity: 1, height: "auto" }}
                                     exit={{ opacity: 0, height: 0 }}
-                                    transition={{ duration: 0.22 }}
+                                    transition={{ duration: 0.2 }}
                                     type="button"
                                     onClick={() => { setAutoSpeak(true); setSpeakHintDismissed(true); }}
                                     style={{
-                                        width: "100%",
+                                        width: "100%", flexShrink: 0,
                                         display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-                                        padding: "7px 16px",
-                                        background: "rgba(131,58,180,0.15)",
-                                        borderTop: "none",
-                                        borderBottom: "1px solid rgba(131,58,180,0.2)",
+                                        padding: "6px 16px",
+                                        background: `rgba(110,124,124,0.1)`,
                                         border: "none",
+                                        borderBottom: `1px solid rgba(245,245,240,0.05)`,
                                         cursor: "pointer",
-                                        flexShrink: 0,
-                                        color: "rgba(192,132,252,0.9)",
-                                        fontSize: "11px",
-                                        letterSpacing: "0.02em",
+                                        color: C.grayCool,
+                                        fontSize: "10px",
+                                        fontFamily: "var(--font-mono)",
+                                        letterSpacing: "0.06em",
+                                        textTransform: "uppercase",
                                     }}
                                 >
-                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ flexShrink: 0 }}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M19.07 4.929a10 10 0 010 14.142M12 5L7 9H4a1 1 0 00-1 1v4a1 1 0 001 1h3l5 4V5z" />
+                                    <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ flexShrink: 0 }}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M19.07 4.929a10 10 0 010 14.142M12 5L7 9H4a1 1 0 00-1 1v4a1 1 0 001 1h3l5 4V5z" />
                                     </svg>
                                     Tap to enable voice replies
-                                    <span style={{ opacity: 0.5, fontSize: "10px" }}>✕</span>
+                                    <span style={{ opacity: 0.4, marginLeft: "4px" }}>✕</span>
                                 </motion.button>
                             )}
                         </AnimatePresence>
 
                         {/* Messages */}
-                        <div
-                            className="flex-1 overflow-y-auto flex flex-col"
-                            style={{ padding: "20px 16px", gap: "8px" }}
-                        >
+                        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px", padding: "18px 16px" }}>
                             {msgs.map((m, i) => {
                                 const isUser = m.role === "user";
                                 const isLastBot = !isUser && (i === msgs.length - 1 || msgs[i + 1]?.role === "user");
                                 return (
-                                    <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start", gap: "4px" }}>
+                                    <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start", gap: "3px" }}>
                                         <div style={{ display: "flex", flexDirection: isUser ? "row-reverse" : "row", alignItems: "flex-end", gap: "8px", width: "100%" }}>
+                                            {/* Bot avatar */}
                                             {!isUser && (
                                                 <div style={{
-                                                    width: "28px", height: "28px", borderRadius: "50%",
-                                                    background: "linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)",
+                                                    width: "26px", height: "26px", borderRadius: "50%",
+                                                    background: C.ivory, color: C.charcoal,
                                                     display: "flex", alignItems: "center", justifyContent: "center",
-                                                    flexShrink: 0, fontSize: "10px", fontWeight: 700, color: "#fff",
+                                                    flexShrink: 0, fontSize: "9px", fontWeight: 700,
+                                                    fontFamily: "var(--font-display)",
                                                     opacity: isLastBot ? 1 : 0, marginBottom: "2px",
-                                                }}>
-                                                    R
-                                                </div>
+                                                }}>R</div>
                                             )}
+
+                                            {/* Bubble */}
                                             <div style={{
                                                 maxWidth: "72%",
-                                                padding: "12px 16px",
-                                                borderRadius: isUser ? "20px 20px 5px 20px" : "20px 20px 20px 5px",
-                                                background: isUser ? "linear-gradient(135deg,#833ab4,#fd1d1d)" : "rgba(255,255,255,0.1)",
-                                                color: "#fff",
-                                                fontSize: "14px",
-                                                lineHeight: "1.5",
+                                                padding: "11px 15px",
+                                                borderRadius: isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                                                background: isUser
+                                                    ? C.ivory
+                                                    : `rgba(245,245,240,0.05)`,
+                                                border: isUser ? "none" : `1px solid rgba(245,245,240,0.07)`,
+                                                color: isUser ? C.charcoal : C.grayLighter,
+                                                fontSize: "13.5px",
+                                                lineHeight: "1.55",
                                                 wordBreak: "break-word",
                                                 whiteSpace: "pre-wrap",
+                                                fontFamily: "var(--font-sans)",
                                             }}>
                                                 {m.text}
                                             </div>
                                         </div>
 
-                                        {/* Manual listen/stop button per bot message */}
+                                        {/* Listen button */}
                                         {!isUser && (
                                             <button
                                                 onClick={() => speakToggle(m.text, i)}
                                                 style={{
-                                                    marginLeft: "36px",
+                                                    marginLeft: "34px",
                                                     display: "flex", alignItems: "center", gap: "4px",
-                                                    color: speaking === i ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.28)",
-                                                    fontSize: "10px", fontFamily: "monospace", letterSpacing: "0.08em",
+                                                    color: speaking === i ? C.grayLighter : C.grayDarker,
+                                                    fontSize: "9px", fontFamily: "var(--font-mono)",
+                                                    letterSpacing: "0.1em", textTransform: "uppercase",
                                                     background: "none", border: "none", cursor: "pointer",
                                                     transition: "color 0.2s",
                                                 }}
-                                                className="hover:!text-white/70"
+                                                onMouseEnter={e => (e.currentTarget.style.color = C.grayLighter)}
+                                                onMouseLeave={e => (e.currentTarget.style.color = speaking === i ? C.grayLighter : C.grayDarker)}
                                             >
                                                 {speaking === i ? (
-                                                    <>
-                                                        <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24">
-                                                            <rect x="6" y="4" width="4" height="16" rx="1" />
-                                                            <rect x="14" y="4" width="4" height="16" rx="1" />
-                                                        </svg>
-                                                        Stop
-                                                    </>
+                                                    <><svg width="9" height="9" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg> Stop</>
                                                 ) : (
-                                                    <>
-                                                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M12 5L7 9H4a1 1 0 00-1 1v4a1 1 0 001 1h3l5 4V5z" />
-                                                        </svg>
-                                                        Listen
-                                                    </>
+                                                    <><svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M12 5L7 9H4a1 1 0 00-1 1v4a1 1 0 001 1h3l5 4V5z" /></svg> Listen</>
                                                 )}
                                             </button>
                                         )}
@@ -399,16 +394,16 @@ export default function ChatBot() {
                                 );
                             })}
 
-                            {/* Typing indicator */}
+                            {/* Typing dots */}
                             {loading && (
                                 <div style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
-                                    <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "10px", fontWeight: 700, color: "#fff" }}>R</div>
-                                    <div style={{ padding: "14px 18px", borderRadius: "20px 20px 20px 5px", background: "rgba(255,255,255,0.1)", display: "flex", gap: "6px", alignItems: "center" }}>
-                                        {[0, 1, 2].map((j) => (
+                                    <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: C.ivory, color: C.charcoal, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "9px", fontWeight: 700 }}>R</div>
+                                    <div style={{ padding: "13px 16px", borderRadius: "18px 18px 18px 4px", background: "rgba(245,245,240,0.05)", border: "1px solid rgba(245,245,240,0.07)", display: "flex", gap: "5px", alignItems: "center" }}>
+                                        {[0, 1, 2].map(j => (
                                             <motion.span key={j}
-                                                style={{ width: "8px", height: "8px", borderRadius: "50%", background: "rgba(255,255,255,0.5)", display: "block" }}
-                                                animate={{ y: [0, -6, 0] }}
-                                                transition={{ repeat: Infinity, duration: 0.8, delay: j * 0.18 }}
+                                                style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.grayCool, display: "block" }}
+                                                animate={{ y: [0, -5, 0] }}
+                                                transition={{ repeat: Infinity, duration: 0.85, delay: j * 0.18 }}
                                             />
                                         ))}
                                     </div>
@@ -419,81 +414,67 @@ export default function ChatBot() {
 
                         {/* Suggestions */}
                         {msgs.length === 1 && (
-                            <div style={{ padding: "8px 16px 12px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
-                                {SUGGESTIONS.map((s) => (
-                                    <button
-                                        key={s}
-                                        onClick={() => send(s)}
+                            <div style={{ padding: "6px 16px 12px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
+                                {SUGGESTIONS.map(s => (
+                                    <button key={s} onClick={() => send(s)}
                                         style={{
-                                            width: "100%", padding: "10px 16px",
-                                            borderRadius: "12px",
-                                            border: "1px solid rgba(255,255,255,0.12)",
-                                            background: "rgba(255,255,255,0.05)",
-                                            color: "rgba(255,255,255,0.7)",
-                                            fontSize: "13px", textAlign: "left",
-                                            cursor: "pointer", transition: "all 0.2s",
+                                            width: "100%", padding: "9px 14px",
+                                            borderRadius: "10px",
+                                            border: `1px solid rgba(245,245,240,0.09)`,
+                                            background: "transparent",
+                                            color: C.grayCool,
+                                            fontSize: "12px", textAlign: "left", cursor: "pointer",
+                                            fontFamily: "var(--font-sans)",
+                                            transition: "border-color 0.2s, color 0.2s",
                                         }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
-                                        onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
-                                    >
-                                        {s}
-                                    </button>
+                                        onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(245,245,240,0.2)"; e.currentTarget.style.color = C.grayLighter; }}
+                                        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(245,245,240,0.09)"; e.currentTarget.style.color = C.grayCool; }}
+                                    >{s}</button>
                                 ))}
                             </div>
                         )}
 
                         {/* Input bar */}
-                        <div style={{ padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
-                            <form
-                                onSubmit={(e) => { e.preventDefault(); send(input); }}
-                                style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                            >
-                                {/* Language toggle (EN ↔ ML) */}
-                                <button
-                                    type="button"
+                        <div style={{ padding: "10px 14px 14px", borderTop: `1px solid rgba(245,245,240,0.06)`, flexShrink: 0 }}>
+                            <form onSubmit={e => { e.preventDefault(); send(input); }}
+                                style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+
+                                {/* EN / ML toggle */}
+                                <button type="button"
                                     onClick={() => setRecLang(l => l === "en-US" ? "ml-IN" : "en-US")}
-                                    title={recLang === "en-US" ? "Switch to Malayalam input" : "Switch to English input"}
+                                    title={recLang === "en-US" ? "Switch to Malayalam" : "Switch to English"}
                                     style={{
                                         flexShrink: 0,
-                                        padding: "4px 8px",
-                                        borderRadius: "12px",
-                                        border: "1px solid rgba(255,255,255,0.15)",
-                                        background: recLang === "ml-IN" ? "rgba(131,58,180,0.25)" : "rgba(255,255,255,0.06)",
-                                        color: recLang === "ml-IN" ? "#c084fc" : "rgba(255,255,255,0.45)",
-                                        fontSize: "10px",
-                                        fontWeight: 700,
-                                        letterSpacing: "0.05em",
-                                        cursor: "pointer",
-                                        transition: "all 0.2s",
-                                        lineHeight: 1,
-                                        height: "28px",
-                                        display: "flex",
-                                        alignItems: "center",
+                                        height: "30px", padding: "0 9px",
+                                        borderRadius: "8px",
+                                        border: `1px solid ${recLang === "ml-IN" ? "rgba(245,245,240,0.2)" : "rgba(245,245,240,0.09)"}`,
+                                        background: recLang === "ml-IN" ? "rgba(245,245,240,0.1)" : "transparent",
+                                        color: recLang === "ml-IN" ? C.ivory : C.grayCool,
+                                        fontSize: "9px", fontWeight: 700,
+                                        fontFamily: "var(--font-mono)",
+                                        letterSpacing: "0.08em",
+                                        cursor: "pointer", transition: "all 0.2s",
                                     }}
-                                >
-                                    {recLang === "ml-IN" ? "ML" : "EN"}
-                                </button>
+                                >{recLang === "ml-IN" ? "ML" : "EN"}</button>
 
-                                {/* Mic button */}
-                                <motion.button
-                                    type="button"
+                                {/* Mic */}
+                                <motion.button type="button"
                                     onClick={toggleListening}
-                                    animate={isListening ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+                                    animate={isListening ? { scale: [1, 1.12, 1] } : { scale: 1 }}
                                     transition={isListening ? { repeat: Infinity, duration: 0.9, ease: "easeInOut" } : { duration: 0.15 }}
                                     title={isListening ? "Stop recording" : "Speak your message"}
                                     style={{
-                                        width: "38px", height: "38px", borderRadius: "50%",
+                                        width: "36px", height: "36px", borderRadius: "50%",
                                         display: "flex", alignItems: "center", justifyContent: "center",
-                                        flexShrink: 0, border: "none", cursor: "pointer",
-                                        background: isListening ? "rgba(255,60,60,0.2)" : "rgba(255,255,255,0.08)",
-                                        color: isListening ? "#ff5555" : "rgba(255,255,255,0.45)",
-                                        transition: "background 0.25s, color 0.25s",
-                                        outline: isListening ? "1.5px solid rgba(255,60,60,0.4)" : "none",
+                                        flexShrink: 0, border: isListening ? `1px solid rgba(245,245,240,0.25)` : `1px solid rgba(245,245,240,0.09)`,
+                                        cursor: "pointer",
+                                        background: isListening ? "rgba(245,245,240,0.1)" : "transparent",
+                                        color: isListening ? C.ivory : C.grayDarker,
+                                        transition: "all 0.25s",
                                     }}
                                 >
                                     {isListening ? (
-                                        /* Waveform icon — indicates active recording */
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                                             <rect x="2"  y="9"  width="2.5" height="6"  rx="1.25" />
                                             <rect x="6"  y="5"  width="2.5" height="14" rx="1.25" />
                                             <rect x="10" y="7"  width="2.5" height="10" rx="1.25" />
@@ -501,62 +482,58 @@ export default function ChatBot() {
                                             <rect x="18" y="7"  width="2.5" height="10" rx="1.25" />
                                         </svg>
                                     ) : (
-                                        /* Mic icon — idle */
-                                        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" />
+                                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" />
                                         </svg>
                                     )}
                                 </motion.button>
 
+                                {/* Text input */}
                                 <input
                                     ref={inputRef}
                                     value={input}
-                                    onChange={(e) => setInput(e.target.value)}
+                                    onChange={e => setInput(e.target.value)}
                                     placeholder={isListening ? (recLang === "ml-IN" ? "മലയാളത്തിൽ സംസാരിക്കൂ…" : "Speak now…") : "Message…"}
                                     readOnly={isListening && !input}
                                     style={{
                                         flex: 1,
-                                        background: isListening ? "rgba(255,80,80,0.08)" : "rgba(255,255,255,0.07)",
-                                        color: "#fff",
-                                        fontSize: "14px",
+                                        background: isListening ? "rgba(245,245,240,0.05)" : "rgba(245,245,240,0.04)",
+                                        color: C.ivory,
+                                        fontSize: "13px",
                                         outline: "none",
-                                        border: isListening ? "1px solid rgba(255,80,80,0.3)" : "1px solid transparent",
-                                        borderRadius: "24px",
-                                        padding: "10px 18px",
-                                        transition: "background 0.25s, border 0.25s",
+                                        border: `1px solid ${isListening ? "rgba(245,245,240,0.18)" : "rgba(245,245,240,0.09)"}`,
+                                        borderRadius: "20px",
+                                        padding: "9px 16px",
+                                        fontFamily: "var(--font-sans)",
+                                        transition: "border 0.25s",
                                     }}
-                                    className="placeholder-white/30"
+                                    className="placeholder-[#4A5454]"
                                 />
 
-                                {/* Send button — enabled while listening so user can tap to stop & send */}
+                                {/* Send / Stop button */}
                                 <button
                                     type="submit"
                                     disabled={(!input.trim() && !isListening) || loading}
-                                    onClick={isListening && !input.trim() ? (e) => { e.preventDefault(); toggleListening(); } : undefined}
+                                    onClick={isListening && !input.trim() ? e => { e.preventDefault(); toggleListening(); } : undefined}
+                                    title={isListening ? "Stop and send" : "Send"}
                                     style={{
-                                        width: "38px", height: "38px", borderRadius: "50%",
-                                        background: isListening
-                                            ? "linear-gradient(135deg,#ff5555,#ff2222)"
-                                            : "linear-gradient(135deg,#833ab4,#fd1d1d)",
+                                        width: "36px", height: "36px", borderRadius: "50%",
+                                        background: isListening ? C.grayLighter : C.ivory,
                                         display: "flex", alignItems: "center", justifyContent: "center",
-                                        flexShrink: 0,
-                                        opacity: (!input.trim() && !isListening) || loading ? 0.32 : 1,
+                                        flexShrink: 0, border: "none",
+                                        opacity: (!input.trim() && !isListening) || loading ? 0.25 : 1,
                                         transition: "opacity 0.2s, background 0.25s",
-                                        border: "none",
                                         cursor: ((!input.trim() && !isListening) || loading) ? "not-allowed" : "pointer",
                                     }}
-                                    title={isListening ? "Stop and send" : "Send"}
                                 >
                                     {isListening ? (
-                                        /* Stop icon when recording */
-                                        <svg width="14" height="14" fill="#fff" viewBox="0 0 24 24">
-                                            <rect x="4" y="4" width="16" height="16" rx="2" />
+                                        <svg width="12" height="12" fill={C.charcoal} viewBox="0 0 24 24">
+                                            <rect x="4" y="4" width="16" height="16" rx="2.5" />
                                         </svg>
                                     ) : (
-                                        /* Arrow icon normally */
-                                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" style={{ transform: "translateX(1px)" }}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={C.charcoal} strokeWidth={2.5} style={{ transform: "translateX(1px)" }}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                                         </svg>
                                     )}
                                 </button>
