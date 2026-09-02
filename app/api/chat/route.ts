@@ -28,21 +28,41 @@ export async function POST(req: Request) {
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
         const model = genAI.getGenerativeModel({
-            model: "gemini-3.6-flash",
+            model: "gemini-1.5-flash",   // fast + stable
             systemInstruction: SYSTEM_PROMPT,
         });
 
-        const chat = model.startChat({
-            history: history ?? [],
+        const chat = model.startChat({ history: history ?? [] });
+
+        // Stream response so text appears word-by-word
+        const result = await chat.sendMessageStream(message);
+
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+            async start(controller) {
+                try {
+                    for await (const chunk of result.stream) {
+                        const text = chunk.text();
+                        if (text) controller.enqueue(encoder.encode(text));
+                    }
+                } catch (e) {
+                    controller.error(e);
+                } finally {
+                    controller.close();
+                }
+            },
         });
 
-        const result = await chat.sendMessage(message);
-        const reply = result.response.text();
-
-        return Response.json({ reply });
+        return new Response(stream, {
+            headers: {
+                "Content-Type": "text/plain; charset=utf-8",
+                "Cache-Control": "no-cache, no-store",
+                "X-Accel-Buffering": "no",   // prevent nginx from buffering the stream
+            },
+        });
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("Chat error:", msg);
-        return Response.json({ reply: `Error: ${msg}` }, { status: 500 });
+        return Response.json({ error: msg }, { status: 500 });
     }
 }

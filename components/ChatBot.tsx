@@ -12,7 +12,6 @@ const C = {
     grayDarker:    "#4A5454",
     grayLighter:   "#B8C5C5",
     ivory:         "#F5F5F0",
-    ivoryWarm:     "#FAFAF8",
 };
 
 type Role = "user" | "model";
@@ -36,12 +35,17 @@ export default function ChatBot() {
     const [autoSpeak, setAutoSpeak] = useState(false);
     const [speakHintDismissed, setSpeakHintDismissed] = useState(false);
     const [recLang, setRecLang] = useState<"en-US" | "ml-IN">("en-US");
-    const bottomRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
+
+    const bottomRef    = useRef<HTMLDivElement>(null);
+    const inputRef     = useRef<HTMLInputElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const recognitionRef = useRef<any>(null);
-    const prevMsgCountRef = useRef(1);
-    const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
+    const recognitionRef  = useRef<any>(null);
+    const voicesRef       = useRef<SpeechSynthesisVoice[]>([]);
+    // Ref mirrors for use inside async send() without stale closures
+    const autoSpeakRef    = useRef(false);
+    const latestBotIdxRef = useRef(-1);
+
+    useEffect(() => { autoSpeakRef.current = autoSpeak; }, [autoSpeak]);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -58,6 +62,7 @@ export default function ChatBot() {
         return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
     }, []);
 
+    /* ─── TTS ─────────────────────────────────────── */
     const isMalayalamText = (text: string) => /[ഀ-ൿ]/.test(text);
 
     const buildAndSpeak = (text: string, idx: number) => {
@@ -65,12 +70,10 @@ export default function ChatBot() {
         const utt = new SpeechSynthesisUtterance(text);
         const ml = isMalayalamText(text);
         utt.lang = ml ? "ml-IN" : "en-US";
-        const voices = voicesRef.current;
-        const langPrefix = ml ? "ml" : "en";
+        const lp = ml ? "ml" : "en";
         const voice =
-            voices.find(v => v.lang === utt.lang) ||
-            voices.find(v => v.lang.startsWith(langPrefix)) ||
-            null;
+            voicesRef.current.find(v => v.lang === utt.lang) ||
+            voicesRef.current.find(v => v.lang.startsWith(lp)) || null;
         if (voice) utt.voice = voice;
         utt.onend = () => setSpeaking(null);
         utt.onerror = () => setSpeaking(null);
@@ -78,31 +81,20 @@ export default function ChatBot() {
         window.speechSynthesis.speak(utt);
     };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => {
-        const last = msgs[msgs.length - 1];
-        const isNew = msgs.length > prevMsgCountRef.current;
-        prevMsgCountRef.current = msgs.length;
-        if (isNew && autoSpeak && last?.role === "model") {
-            buildAndSpeak(last.text, msgs.length - 1);
-        }
-    }, [msgs, autoSpeak]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    const buildHistory = (messages: Msg[]) => {
-        const withoutLast = messages.slice(0, -1);
-        const firstUser = withoutLast.findIndex((m) => m.role === "user");
-        if (firstUser === -1) return [];
-        return withoutLast.slice(firstUser).map((m) => ({
-            role: m.role,
-            parts: [{ text: m.text }],
-        }));
-    };
-
     const speakToggle = (text: string, idx: number) => {
         if (speaking === idx) { window.speechSynthesis.cancel(); setSpeaking(null); return; }
         buildAndSpeak(text, idx);
     };
 
+    /* ─── History builder ──────────────────────────── */
+    const buildHistory = (messages: Msg[]) => {
+        const withoutLast = messages.slice(0, -1);
+        const firstUser = withoutLast.findIndex(m => m.role === "user");
+        if (firstUser === -1) return [];
+        return withoutLast.slice(firstUser).map(m => ({ role: m.role, parts: [{ text: m.text }] }));
+    };
+
+    /* ─── Send with streaming ──────────────────────── */
     const send = async (text: string) => {
         if (!text.trim() || loading) return;
         const userMsg: Msg = { role: "user", text: text.trim() };
@@ -110,38 +102,75 @@ export default function ChatBot() {
         setMsgs(next);
         setInput("");
         setLoading(true);
+
+        let accumulated = "";
+        let firstChunk = true;
+
         try {
             const res = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: text.trim(), history: buildHistory(next) }),
             });
-            const data = await res.json();
-            setMsgs((prev) => [...prev, { role: "model", text: data.reply }]);
+
+            if (!res.ok || !res.body) throw new Error("Request failed");
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                if (!chunk) continue;
+                accumulated += chunk;
+
+                if (firstChunk) {
+                    firstChunk = false;
+                    setLoading(false);
+                    setMsgs(prev => {
+                        latestBotIdxRef.current = prev.length;   // index of new bot msg
+                        return [...prev, { role: "model", text: chunk }];
+                    });
+                } else {
+                    setMsgs(prev => {
+                        const updated = [...prev];
+                        const last = updated[updated.length - 1];
+                        if (last?.role === "model") {
+                            updated[updated.length - 1] = { role: "model", text: last.text + chunk };
+                        }
+                        return updated;
+                    });
+                }
+            }
+
+            // Auto-speak the COMPLETE reply (not chunk-by-chunk)
+            if (autoSpeakRef.current && accumulated && latestBotIdxRef.current >= 0) {
+                buildAndSpeak(accumulated, latestBotIdxRef.current);
+            }
+
         } catch {
-            setMsgs((prev) => [...prev, { role: "model", text: "Something went wrong. Please try again." }]);
+            setMsgs(prev => [...prev, { role: "model", text: "Something went wrong. Please try again." }]);
         } finally {
             setLoading(false);
         }
     };
 
-    const toggleListening = () => {
-        if (isListening) {
-            recognitionRef.current?.stop();
-            setIsListening(false);
-            if (input.trim()) send(input.trim());
-            return;
-        }
+    /* ─── Voice: hold-to-speak ────────────────────── */
+    const startListening = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SR) { alert("Voice input isn't supported in this browser.\nPlease use Chrome or Edge."); return; }
+
         window.speechSynthesis.cancel();
         setSpeaking(null);
         setInput("");
+
         const rec = new SR();
         rec.lang = recLang;
         rec.interimResults = true;
         rec.maxAlternatives = 1;
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         rec.onresult = (e: any) => {
             let interim = "", finalText = "";
@@ -154,9 +183,31 @@ export default function ChatBot() {
         };
         rec.onend = () => setIsListening(false);
         rec.onerror = () => { setIsListening(false); setInput(""); };
+
         recognitionRef.current = rec;
         rec.start();
         setIsListening(true);
+    };
+
+    const stopListening = () => {
+        recognitionRef.current?.stop();
+        // onresult fires with isFinal after stop() — if interim text is in input, send it
+        setTimeout(() => {
+            setInput(prev => {
+                if (prev.trim()) { send(prev.trim()); return ""; }
+                return prev;
+            });
+        }, 400);
+    };
+
+    // Hold-to-speak: pointer events (works for both mouse and touch)
+    const handleMicPointerDown = (e: React.PointerEvent) => {
+        e.currentTarget.setPointerCapture(e.pointerId);   // keep capture even if finger moves off
+        startListening();
+    };
+
+    const handleMicPointerUp = () => {
+        if (isListening) stopListening();
     };
 
     const closeChat = () => {
@@ -220,7 +271,7 @@ export default function ChatBot() {
                             width: "min(400px, calc(100vw - 2rem))",
                             height: "min(580px, calc(100vh - 9rem))",
                             background: C.charcoalDark,
-                            border: `1px solid rgba(245,245,240,0.07)`,
+                            border: "1px solid rgba(245,245,240,0.07)",
                             borderRadius: "20px",
                             boxShadow: "0 40px 100px rgba(0,0,0,0.75), 0 8px 24px rgba(0,0,0,0.5)",
                         }}
@@ -230,10 +281,9 @@ export default function ChatBot() {
                             display: "flex", alignItems: "center", gap: "12px",
                             padding: "14px 18px",
                             background: C.charcoal,
-                            borderBottom: `1px solid rgba(245,245,240,0.06)`,
+                            borderBottom: "1px solid rgba(245,245,240,0.06)",
                             flexShrink: 0,
                         }}>
-                            {/* Avatar */}
                             <div style={{ position: "relative", flexShrink: 0 }}>
                                 <div style={{
                                     width: "38px", height: "38px", borderRadius: "50%",
@@ -249,7 +299,6 @@ export default function ChatBot() {
                                     border: `2px solid ${C.charcoal}`,
                                 }} />
                             </div>
-
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <p style={{ color: C.ivory, fontSize: "13px", fontWeight: 600, lineHeight: 1, marginBottom: "4px", fontFamily: "var(--font-display)" }}>
                                     Rinshad AI
@@ -262,7 +311,7 @@ export default function ChatBot() {
                             {/* Auto-speak toggle */}
                             <button
                                 onClick={() => { setAutoSpeak(v => !v); if (autoSpeak) { window.speechSynthesis.cancel(); setSpeaking(null); } }}
-                                title={autoSpeak ? "Voice replies on — click to mute" : "Voice replies off — click to enable"}
+                                title={autoSpeak ? "Voice replies on" : "Voice replies off"}
                                 style={{
                                     width: "30px", height: "30px", borderRadius: "50%",
                                     display: "flex", alignItems: "center", justifyContent: "center",
@@ -275,15 +324,12 @@ export default function ChatBot() {
                             </button>
 
                             {/* Close */}
-                            <button
-                                onClick={closeChat}
-                                style={{
-                                    width: "30px", height: "30px", borderRadius: "50%",
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    background: "transparent", border: "none", cursor: "pointer",
-                                    color: C.grayDarker,
-                                    transition: "color 0.2s",
-                                }}
+                            <button onClick={closeChat} style={{
+                                width: "30px", height: "30px", borderRadius: "50%",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                background: "transparent", border: "none", cursor: "pointer",
+                                color: C.grayDarker, transition: "color 0.2s",
+                            }}
                                 onMouseEnter={e => (e.currentTarget.style.color = C.grayLighter)}
                                 onMouseLeave={e => (e.currentTarget.style.color = C.grayDarker)}
                             >
@@ -307,9 +353,9 @@ export default function ChatBot() {
                                         width: "100%", flexShrink: 0,
                                         display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
                                         padding: "6px 16px",
-                                        background: `rgba(110,124,124,0.1)`,
+                                        background: "rgba(110,124,124,0.1)",
                                         border: "none",
-                                        borderBottom: `1px solid rgba(245,245,240,0.05)`,
+                                        borderBottom: "1px solid rgba(245,245,240,0.05)",
                                         cursor: "pointer",
                                         color: C.grayCool,
                                         fontSize: "10px",
@@ -335,7 +381,6 @@ export default function ChatBot() {
                                 return (
                                     <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start", gap: "3px" }}>
                                         <div style={{ display: "flex", flexDirection: isUser ? "row-reverse" : "row", alignItems: "flex-end", gap: "8px", width: "100%" }}>
-                                            {/* Bot avatar */}
                                             {!isUser && (
                                                 <div style={{
                                                     width: "26px", height: "26px", borderRadius: "50%",
@@ -346,16 +391,12 @@ export default function ChatBot() {
                                                     opacity: isLastBot ? 1 : 0, marginBottom: "2px",
                                                 }}>R</div>
                                             )}
-
-                                            {/* Bubble */}
                                             <div style={{
                                                 maxWidth: "72%",
                                                 padding: "11px 15px",
                                                 borderRadius: isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                                                background: isUser
-                                                    ? C.ivory
-                                                    : `rgba(245,245,240,0.05)`,
-                                                border: isUser ? "none" : `1px solid rgba(245,245,240,0.07)`,
+                                                background: isUser ? C.ivory : "rgba(245,245,240,0.05)",
+                                                border: isUser ? "none" : "1px solid rgba(245,245,240,0.07)",
                                                 color: isUser ? C.charcoal : C.grayLighter,
                                                 fontSize: "13.5px",
                                                 lineHeight: "1.55",
@@ -367,10 +408,8 @@ export default function ChatBot() {
                                             </div>
                                         </div>
 
-                                        {/* Listen button */}
                                         {!isUser && (
-                                            <button
-                                                onClick={() => speakToggle(m.text, i)}
+                                            <button onClick={() => speakToggle(m.text, i)}
                                                 style={{
                                                     marginLeft: "34px",
                                                     display: "flex", alignItems: "center", gap: "4px",
@@ -420,7 +459,7 @@ export default function ChatBot() {
                                         style={{
                                             width: "100%", padding: "9px 14px",
                                             borderRadius: "10px",
-                                            border: `1px solid rgba(245,245,240,0.09)`,
+                                            border: "1px solid rgba(245,245,240,0.09)",
                                             background: "transparent",
                                             color: C.grayCool,
                                             fontSize: "12px", textAlign: "left", cursor: "pointer",
@@ -435,7 +474,7 @@ export default function ChatBot() {
                         )}
 
                         {/* Input bar */}
-                        <div style={{ padding: "10px 14px 14px", borderTop: `1px solid rgba(245,245,240,0.06)`, flexShrink: 0 }}>
+                        <div style={{ padding: "10px 14px 14px", borderTop: "1px solid rgba(245,245,240,0.06)", flexShrink: 0 }}>
                             <form onSubmit={e => { e.preventDefault(); send(input); }}
                                 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
 
@@ -457,44 +496,78 @@ export default function ChatBot() {
                                     }}
                                 >{recLang === "ml-IN" ? "ML" : "EN"}</button>
 
-                                {/* Mic */}
-                                <motion.button type="button"
-                                    onClick={toggleListening}
-                                    animate={isListening ? { scale: [1, 1.12, 1] } : { scale: 1 }}
-                                    transition={isListening ? { repeat: Infinity, duration: 0.9, ease: "easeInOut" } : { duration: 0.15 }}
-                                    title={isListening ? "Stop recording" : "Speak your message"}
-                                    style={{
-                                        width: "36px", height: "36px", borderRadius: "50%",
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        flexShrink: 0, border: isListening ? `1px solid rgba(245,245,240,0.25)` : `1px solid rgba(245,245,240,0.09)`,
-                                        cursor: "pointer",
-                                        background: isListening ? "rgba(245,245,240,0.1)" : "transparent",
-                                        color: isListening ? C.ivory : C.grayDarker,
-                                        transition: "all 0.25s",
-                                    }}
-                                >
-                                    {isListening ? (
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                            <rect x="2"  y="9"  width="2.5" height="6"  rx="1.25" />
-                                            <rect x="6"  y="5"  width="2.5" height="14" rx="1.25" />
-                                            <rect x="10" y="7"  width="2.5" height="10" rx="1.25" />
-                                            <rect x="14" y="3"  width="2.5" height="18" rx="1.25" />
-                                            <rect x="18" y="7"  width="2.5" height="10" rx="1.25" />
-                                        </svg>
-                                    ) : (
-                                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" />
-                                        </svg>
+                                {/* Mic — hold to speak */}
+                                <div style={{ position: "relative", flexShrink: 0 }}>
+                                    <motion.button
+                                        type="button"
+                                        onPointerDown={handleMicPointerDown}
+                                        onPointerUp={handleMicPointerUp}
+                                        onPointerCancel={handleMicPointerUp}
+                                        animate={isListening ? { scale: [1, 1.12, 1] } : { scale: 1 }}
+                                        transition={isListening ? { repeat: Infinity, duration: 0.9, ease: "easeInOut" } : { duration: 0.15 }}
+                                        title={isListening ? "Release to send" : "Hold to speak"}
+                                        style={{
+                                            width: "36px", height: "36px", borderRadius: "50%",
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            border: `1px solid ${isListening ? "rgba(245,245,240,0.25)" : "rgba(245,245,240,0.09)"}`,
+                                            cursor: "pointer",
+                                            background: isListening ? "rgba(245,245,240,0.12)" : "transparent",
+                                            color: isListening ? C.ivory : C.grayDarker,
+                                            transition: "all 0.2s",
+                                            userSelect: "none",
+                                            WebkitUserSelect: "none",
+                                            touchAction: "none",   // prevent scroll interference on mobile
+                                        }}
+                                    >
+                                        {isListening ? (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                                <rect x="2"  y="9"  width="2.5" height="6"  rx="1.25" />
+                                                <rect x="6"  y="5"  width="2.5" height="14" rx="1.25" />
+                                                <rect x="10" y="7"  width="2.5" height="10" rx="1.25" />
+                                                <rect x="14" y="3"  width="2.5" height="18" rx="1.25" />
+                                                <rect x="18" y="7"  width="2.5" height="10" rx="1.25" />
+                                            </svg>
+                                        ) : (
+                                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" />
+                                            </svg>
+                                        )}
+                                    </motion.button>
+                                    {/* "Hold" label under mic — only when idle */}
+                                    {!isListening && (
+                                        <span style={{
+                                            position: "absolute", bottom: "-13px", left: "50%",
+                                            transform: "translateX(-50%)",
+                                            fontSize: "7px", color: C.grayDarker,
+                                            fontFamily: "var(--font-mono)",
+                                            letterSpacing: "0.05em",
+                                            whiteSpace: "nowrap",
+                                            pointerEvents: "none",
+                                        }}>HOLD</span>
                                     )}
-                                </motion.button>
+                                    {isListening && (
+                                        <span style={{
+                                            position: "absolute", bottom: "-13px", left: "50%",
+                                            transform: "translateX(-50%)",
+                                            fontSize: "7px", color: C.grayLighter,
+                                            fontFamily: "var(--font-mono)",
+                                            letterSpacing: "0.05em",
+                                            whiteSpace: "nowrap",
+                                            pointerEvents: "none",
+                                        }}>RELEASE</span>
+                                    )}
+                                </div>
 
                                 {/* Text input */}
                                 <input
                                     ref={inputRef}
                                     value={input}
                                     onChange={e => setInput(e.target.value)}
-                                    placeholder={isListening ? (recLang === "ml-IN" ? "മലയാളത്തിൽ സംസാരിക്കൂ…" : "Speak now…") : "Message…"}
+                                    placeholder={isListening
+                                        ? (recLang === "ml-IN" ? "സംസാരിക്കൂ…" : "Listening…")
+                                        : "Message…"
+                                    }
                                     readOnly={isListening && !input}
                                     style={{
                                         flex: 1,
@@ -507,35 +580,30 @@ export default function ChatBot() {
                                         padding: "9px 16px",
                                         fontFamily: "var(--font-sans)",
                                         transition: "border 0.25s",
+                                        marginBottom: "2px",   // room for HOLD label
                                     }}
                                     className="placeholder-[#4A5454]"
                                 />
 
-                                {/* Send / Stop button */}
+                                {/* Send button */}
                                 <button
                                     type="submit"
-                                    disabled={(!input.trim() && !isListening) || loading}
-                                    onClick={isListening && !input.trim() ? e => { e.preventDefault(); toggleListening(); } : undefined}
-                                    title={isListening ? "Stop and send" : "Send"}
+                                    disabled={!input.trim() || loading}
+                                    title="Send"
                                     style={{
                                         width: "36px", height: "36px", borderRadius: "50%",
-                                        background: isListening ? C.grayLighter : C.ivory,
+                                        background: C.ivory,
                                         display: "flex", alignItems: "center", justifyContent: "center",
                                         flexShrink: 0, border: "none",
-                                        opacity: (!input.trim() && !isListening) || loading ? 0.25 : 1,
-                                        transition: "opacity 0.2s, background 0.25s",
-                                        cursor: ((!input.trim() && !isListening) || loading) ? "not-allowed" : "pointer",
+                                        opacity: !input.trim() || loading ? 0.22 : 1,
+                                        transition: "opacity 0.2s",
+                                        cursor: !input.trim() || loading ? "not-allowed" : "pointer",
+                                        marginBottom: "2px",
                                     }}
                                 >
-                                    {isListening ? (
-                                        <svg width="12" height="12" fill={C.charcoal} viewBox="0 0 24 24">
-                                            <rect x="4" y="4" width="16" height="16" rx="2.5" />
-                                        </svg>
-                                    ) : (
-                                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={C.charcoal} strokeWidth={2.5} style={{ transform: "translateX(1px)" }}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                        </svg>
-                                    )}
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={C.charcoal} strokeWidth={2.5} style={{ transform: "translateX(1px)" }}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                    </svg>
                                 </button>
                             </form>
                         </div>
