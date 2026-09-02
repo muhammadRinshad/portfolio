@@ -138,7 +138,7 @@ export default function About() {
                             texts={[P1, P2]}
                             progress={scrollYProgress}
                             rangeStart={0}
-                            rangeEnd={1}
+                            rangeEnd={0.65}
                         />
                     </div>
                 </div>

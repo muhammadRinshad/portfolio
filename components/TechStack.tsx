@@ -51,7 +51,7 @@ function TechCard({ tech, index }: { tech: Tech; index: number }) {
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.85, y: 8 }}
       transition={{ duration: 0.3, delay: index * 0.025, ease: cardEase }}
-      className="ts-card flex flex-col items-center justify-center gap-2.5 rounded-2xl cursor-default"
+      className="ts-card cursor-target flex flex-col items-center justify-center gap-2.5 rounded-2xl cursor-default"
       style={{
         padding: "1.25rem 0.5rem",
         background: "rgba(255,255,255,0.035)",

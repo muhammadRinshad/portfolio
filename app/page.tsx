@@ -13,6 +13,7 @@ import TechStack from "@/components/TechStack";
 import Work from "@/components/Work";
 import Footer from "@/components/Footer";
 import ProfilePhoto from "@/components/ProfilePhoto";
+import ChatBot from "@/components/ChatBot";
 
 const TargetCursor = dynamic(() => import("@/components/TargetCursor"), { ssr: false });
 
@@ -99,6 +100,11 @@ export default function Home() {
           </div>
         </>
       )}
+
+      {/* Always mounted so chat history survives going back to hero */}
+      <div style={{ display: entered ? "block" : "none" }}>
+        <ChatBot />
+      </div>
 
       <AnimatePresence>
         {!entered && (

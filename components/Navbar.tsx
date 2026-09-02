@@ -52,9 +52,8 @@ export default function Navbar() {
 
                 {/* Nav content */}
                 <nav className="relative mix-blend-difference text-ivory">
-                    <div className="w-full max-w-[100rem] mx-auto px-6 sm:px-12 md:px-20 lg:px-28">
-                        <div className="flex justify-between items-center h-20">
-
+                    <div className="w-full max-w-[100rem] mx-auto pl-6 pr-8 sm:pl-12 sm:pr-14 md:pl-20 md:pr-24 lg:pl-28 lg:pr-32">
+                        <div className="flex justify-end items-center h-20 gap-x-10">
 
                             {/* Desktop links */}
                             <div className="hidden md:flex gap-x-10">
