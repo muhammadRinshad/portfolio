@@ -22,11 +22,13 @@ export default function ChatBot() {
     const [speaking, setSpeaking] = useState<number | null>(null);
     const [isListening, setIsListening] = useState(false);
     const [autoSpeak, setAutoSpeak] = useState(true);
+    const [recLang, setRecLang] = useState<"en-US" | "ml-IN">("en-US");
     const bottomRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recognitionRef = useRef<any>(null);
-    const prevMsgCountRef = useRef(1); // tracks when a new bot message arrives
+    const prevMsgCountRef = useRef(1);
+    const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,20 +38,46 @@ export default function ChatBot() {
         if (open) setTimeout(() => inputRef.current?.focus(), 300);
     }, [open]);
 
+    // Pre-load TTS voices (they load async in browsers)
+    useEffect(() => {
+        const load = () => { voicesRef.current = window.speechSynthesis.getVoices(); };
+        load();
+        window.speechSynthesis.addEventListener("voiceschanged", load);
+        return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
+    }, []);
+
+    // Detect if text is primarily Malayalam (Unicode block U+0D00–U+0D7F)
+    const isMalayalamText = (text: string) => /[ഀ-ൿ]/.test(text);
+
+    // Build and speak a utterance with correct lang + voice
+    const buildAndSpeak = (text: string, idx: number) => {
+        window.speechSynthesis.cancel();
+        const utt = new SpeechSynthesisUtterance(text);
+        const ml = isMalayalamText(text);
+        utt.lang = ml ? "ml-IN" : "en-US";
+        // Pick the best matching voice
+        const voices = voicesRef.current;
+        const langPrefix = ml ? "ml" : "en";
+        const voice =
+            voices.find(v => v.lang === utt.lang) ||           // exact match
+            voices.find(v => v.lang.startsWith(langPrefix)) || // prefix match
+            null;
+        if (voice) utt.voice = voice;
+        utt.onend = () => setSpeaking(null);
+        utt.onerror = () => setSpeaking(null);
+        setSpeaking(idx);
+        window.speechSynthesis.speak(utt);
+    };
+
     // Auto-speak new bot messages
     useEffect(() => {
         const last = msgs[msgs.length - 1];
         const isNew = msgs.length > prevMsgCountRef.current;
         prevMsgCountRef.current = msgs.length;
         if (isNew && autoSpeak && last?.role === "model") {
-            window.speechSynthesis.cancel();
-            const utt = new SpeechSynthesisUtterance(last.text);
-            const idx = msgs.length - 1;
-            utt.onend = () => setSpeaking(null);
-            utt.onerror = () => setSpeaking(null);
-            setSpeaking(idx);
-            window.speechSynthesis.speak(utt);
+            buildAndSpeak(last.text, msgs.length - 1);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [msgs, autoSpeak]);
 
     const buildHistory = (messages: Msg[]) => {
@@ -63,13 +91,12 @@ export default function ChatBot() {
     };
 
     const speakToggle = (text: string, idx: number) => {
-        window.speechSynthesis.cancel();
-        if (speaking === idx) { setSpeaking(null); return; }
-        const utt = new SpeechSynthesisUtterance(text);
-        utt.onend = () => setSpeaking(null);
-        utt.onerror = () => setSpeaking(null);
-        setSpeaking(idx);
-        window.speechSynthesis.speak(utt);
+        if (speaking === idx) {
+            window.speechSynthesis.cancel();
+            setSpeaking(null);
+            return;
+        }
+        buildAndSpeak(text, idx);
     };
 
     const send = async (text: string) => {
@@ -119,7 +146,7 @@ export default function ChatBot() {
         setInput(""); // clear input before recording
 
         const rec = new SR();
-        rec.lang = "en-US";
+        rec.lang = recLang;          // "en-US" or "ml-IN" based on toggle
         rec.interimResults = true;   // show live transcript in input field
         rec.maxAlternatives = 1;
 
@@ -386,6 +413,32 @@ export default function ChatBot() {
                                 onSubmit={(e) => { e.preventDefault(); send(input); }}
                                 style={{ display: "flex", alignItems: "center", gap: "8px" }}
                             >
+                                {/* Language toggle (EN ↔ ML) */}
+                                <button
+                                    type="button"
+                                    onClick={() => setRecLang(l => l === "en-US" ? "ml-IN" : "en-US")}
+                                    title={recLang === "en-US" ? "Switch to Malayalam input" : "Switch to English input"}
+                                    style={{
+                                        flexShrink: 0,
+                                        padding: "4px 8px",
+                                        borderRadius: "12px",
+                                        border: "1px solid rgba(255,255,255,0.15)",
+                                        background: recLang === "ml-IN" ? "rgba(131,58,180,0.25)" : "rgba(255,255,255,0.06)",
+                                        color: recLang === "ml-IN" ? "#c084fc" : "rgba(255,255,255,0.45)",
+                                        fontSize: "10px",
+                                        fontWeight: 700,
+                                        letterSpacing: "0.05em",
+                                        cursor: "pointer",
+                                        transition: "all 0.2s",
+                                        lineHeight: 1,
+                                        height: "28px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    {recLang === "ml-IN" ? "ML" : "EN"}
+                                </button>
+
                                 {/* Mic button */}
                                 <motion.button
                                     type="button"
@@ -425,7 +478,7 @@ export default function ChatBot() {
                                     ref={inputRef}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
-                                    placeholder={isListening ? "Speak now…" : "Message…"}
+                                    placeholder={isListening ? (recLang === "ml-IN" ? "മലയാളത്തിൽ സംസാരിക്കൂ…" : "Speak now…") : "Message…"}
                                     readOnly={isListening && !input}
                                     style={{
                                         flex: 1,
