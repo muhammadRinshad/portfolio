@@ -144,14 +144,6 @@ export default function About() {
                 </div>
             </motion.div>
 
-            {/* Mobile photo */}
-            <div
-                className="lg:hidden absolute inset-0 pointer-events-none"
-                style={{ opacity: 0.18, zIndex: 1 }}
-            >
-                <Image src={PHOTO} alt="" fill className="object-contain object-bottom" priority />
-            </div>
-
             {/* Desktop photo */}
             <div className="hidden lg:block relative" style={{ width: "50vw", flexShrink: 0 }}>
                 <div className="absolute inset-0">
