@@ -113,6 +113,13 @@ export async function POST(req: Request) {
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("Chat error:", msg);
+        if (msg.includes("503") || msg.toLowerCase().includes("service unavailable")) {
+            return Response.json({ error: "overloaded" }, { status: 503 });
+        }
+        // Gemini quota exceeded (different from our own IP rate limit)
+        if (msg.includes("429") || msg.toLowerCase().includes("quota")) {
+            return Response.json({ error: "quota_exceeded" }, { status: 429 });
+        }
         return Response.json({ error: msg }, { status: 500 });
     }
 }

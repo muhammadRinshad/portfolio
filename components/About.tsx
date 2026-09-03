@@ -126,7 +126,7 @@ export default function About() {
                         className="font-display font-bold leading-tight mb-6 sm:mb-8"
                         style={{ fontSize: "clamp(2rem, 3.6vw, 3.75rem)" }}
                     >
-                        Design-Driven <br />
+                        Creative <br />
                         <span className="text-gray-cool italic font-serif">MERN Stack Developer</span>
                     </h2>
 

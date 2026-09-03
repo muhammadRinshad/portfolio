@@ -186,10 +186,18 @@ export default function ChatBot() {
                 signal: controller.signal,
             });
 
+            if (res.status === 503) {
+                setMsgs(prev => [...prev, { role: "model", text: "⚡ The AI is temporarily overloaded. Please try again in a moment." }]);
+                return;
+            }
             if (res.status === 429) {
                 const data = await res.json().catch(() => ({}));
-                const mins = data.resetInMin ?? 60;
-                setMsgs(prev => [...prev, { role: "model", text: `🚫 You've sent too many messages. Please wait about ${mins} minute${mins !== 1 ? "s" : ""} and try again.` }]);
+                if (data.error === "quota_exceeded") {
+                    setMsgs(prev => [...prev, { role: "model", text: "📊 The AI's daily quota has been reached. Please try again tomorrow, or reach Rinshad directly at muhammadrinshad13@gmail.com 👋" }]);
+                } else {
+                    const mins = data.resetInMin ?? 60;
+                    setMsgs(prev => [...prev, { role: "model", text: `🚫 You've sent too many messages. Please wait about ${mins} minute${mins !== 1 ? "s" : ""} and try again.` }]);
+                }
                 return;
             }
             if (!res.ok || !res.body) throw new Error("Request failed");
