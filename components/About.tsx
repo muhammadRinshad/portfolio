@@ -100,7 +100,7 @@ export default function About() {
         <section
             ref={sectionRef}
             id="about"
-            className="relative flex flex-col lg:flex-row min-h-screen w-full bg-transparent overflow-hidden"
+            className="relative flex flex-col lg:flex-row lg:min-h-screen w-full bg-transparent overflow-hidden"
         >
             {/* Decorative background text */}
             <div className="absolute top-20 lg:top-32 left-0 w-full overflow-hidden leading-none opacity-[0.04] select-none pointer-events-none z-0">
@@ -115,7 +115,7 @@ export default function About() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8 }}
-                className="section-content flex-1 min-w-0 flex flex-col justify-center relative z-10 py-14 sm:py-20 lg:py-0 pr-4"
+                className="section-content flex-1 min-w-0 flex flex-col justify-center relative z-10 py-10 sm:py-20 lg:py-0 pr-4"
             >
                 <div className="w-full max-w-[520px]">
                     <span className="text-gray-cool font-mono text-sm tracking-widest uppercase mb-4 block">
