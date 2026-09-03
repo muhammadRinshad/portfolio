@@ -89,11 +89,13 @@ body::-webkit-scrollbar {
   padding-right: clamp(1rem, 2.5vw, 2.5rem);
 }
 
-/* Base Styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Base Styles — kept in @layer base so Tailwind utility classes can override */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 }
 
 html {

@@ -52,7 +52,13 @@ export default function Navbar() {
 
                 {/* Nav content */}
                 <nav className="relative mix-blend-difference text-ivory">
-                    <div className="w-full max-w-[100rem] mx-auto pl-6 pr-8 sm:pl-12 sm:pr-14 md:pl-20 md:pr-24 lg:pl-28 lg:pr-32">
+                    <div
+                        className="w-full max-w-[100rem] mx-auto"
+                        style={{
+                            paddingLeft:  "clamp(1.5rem, 5vw, 7rem)",
+                            paddingRight: "clamp(1.5rem, 5vw, 7rem)",
+                        }}
+                    >
                         <div className="flex justify-end items-center h-20 gap-x-10">
 
                             {/* Desktop links */}
